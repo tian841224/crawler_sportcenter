@@ -1,0 +1,5 @@
+# 南屯運動中心設定
+CHOOSE_WEEKDAY = "二" # 選擇要預約的日期 ex: 一 二 三 四 五 六 日
+TIME_SLOT_CODE = 8 # 選擇要預約的時段代碼 TimeSlotCode
+ID = "" # 身份證字號
+PASSWORD = "" #密碼
