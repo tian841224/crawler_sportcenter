@@ -1,4 +1,4 @@
-package web
+package crawler
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/tian841224/crawler_sportcenter/internal/crawler"
+	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/types"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
@@ -20,16 +20,16 @@ type NantunSportCenterInterface interface {
 var _ NantunSportCenterInterface = (*NantunSportCenterService)(nil)
 
 type NantunSportCenterService struct {
-	crawlerService crawler.CrawlerService
+	browserService browser.BrowserService
 	Nantun_Url     string // 南屯運動中心網址
-	PaymentURL     string // 繳費網址
+	paymentURL     string // 繳費網址
 }
 
-func NewSportCenterService(crawlerService crawler.CrawlerService) NantunSportCenterService {
+func NewNantunSportCenterService(browserService browser.BrowserService) NantunSportCenterService {
 	return NantunSportCenterService{
-		crawlerService: crawlerService,
+		browserService: browserService,
 		Nantun_Url:     "https://nd01.xuanen.com.tw/BPMember/BPMemberLogin",
-		PaymentURL:     "https://nd01.xuanen.com.tw/BPMemberOrder/BPMemberOrder",
+		paymentURL:     "https://nd01.xuanen.com.tw/BPMemberOrder/BPMemberOrder",
 	}
 }
 
@@ -38,15 +38,15 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 
 	// #region 設定頁面
 	// 初始化瀏覽器
-	s.crawlerService.InitBrowser()
+	s.browserService.InitBrowser()
 	// 建立新頁面
-	page, err := s.crawlerService.GetPage()
+	page, err := s.browserService.GetPage()
 	if err != nil {
 		return err
 	}
 
 	// 設定網頁模式
-	s.crawlerService.SetWebMode(true)
+	s.browserService.SetWebMode(true)
 
 	// 讀取網站
 	if err = page.Navigate(s.Nantun_Url); err != nil {
@@ -288,14 +288,14 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 	// #region 有預約成功，前往繳費網頁
 	if bookCount > 0 {
 		// 讀取網站
-		if err = page.Navigate(s.PaymentURL); err != nil {
+		if err = page.Navigate(s.paymentURL); err != nil {
 			return err
 		}
 	}
 	// #endregion
 
 	// 關閉瀏覽器
-	s.crawlerService.Close()
+	s.browserService.Close()
 	return nil
 }
 

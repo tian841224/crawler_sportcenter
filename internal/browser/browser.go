@@ -1,4 +1,4 @@
-package crawler
+package browser
 
 import (
 	"github.com/go-rod/rod"
@@ -9,26 +9,26 @@ import (
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 )
 
-type CrawlerInterface interface {
+type BrowserInterface interface {
 	InitBrowser() error
 	GetPage() (*rod.Page, error)
 	Close() error
 	SetWebMode(isMobileMode bool) error
 }
 
-var _ CrawlerInterface = (*CrawlerService)(nil)
+var _ BrowserInterface = (*BrowserService)(nil)
 
-type CrawlerService struct {
+type BrowserService struct {
 	browser *rod.Browser
 	page    *rod.Page
 }
 
-func NewCrawlerService() CrawlerService {
-	return CrawlerService{}
+func NewBrowserService() BrowserService {
+	return BrowserService{}
 }
 
 // 初始化爬蟲
-func (s *CrawlerService) InitBrowser() error {
+func (s *BrowserService) InitBrowser() error {
 	// 設定瀏覽器啟動選項
 	l := launcher.New().
 		Headless(false).
@@ -49,7 +49,7 @@ func (s *CrawlerService) InitBrowser() error {
 }
 
 // 取得頁面
-func (s *CrawlerService) GetPage() (*rod.Page, error) {
+func (s *BrowserService) GetPage() (*rod.Page, error) {
 	// 建立新頁面
 	page := s.browser.MustPage("")
 	s.page = page
@@ -93,7 +93,7 @@ func (s *CrawlerService) GetPage() (*rod.Page, error) {
 }
 
 // 關閉瀏覽器
-func (s *CrawlerService) Close() error {
+func (s *BrowserService) Close() error {
 	if s.browser != nil {
 		return s.browser.Close()
 	}
@@ -101,7 +101,7 @@ func (s *CrawlerService) Close() error {
 }
 
 // 設定網頁模式
-func (s *CrawlerService) SetWebMode(isMobileMode bool) error {
+func (s *BrowserService) SetWebMode(isMobileMode bool) error {
 	if s.page == nil {
 		return nil
 	}

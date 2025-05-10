@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
-	"github.com/tian841224/crawler_sportcenter/internal/web"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 )
@@ -16,7 +16,7 @@ func main() {
 	// 載入設定檔
 	cfg := config.LoadConfig()
 
-	crawler := crawler.NewCrawlerService()
-	sportCenterService := web.NewSportCenterService(crawler)
-	sportCenterService.CrawlerNantun(cfg)
+	browser := browser.NewBrowserService()
+	nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
+	nantunSportCenterService.CrawlerNantun(cfg)
 }
