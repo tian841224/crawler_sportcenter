@@ -22,12 +22,14 @@ var _ NantunSportCenterInterface = (*NantunSportCenterService)(nil)
 type NantunSportCenterService struct {
 	crawlerService crawler.CrawlerService
 	Nantun_Url     string // 南屯運動中心網址
+	PaymentURL     string // 繳費網址
 }
 
 func NewSportCenterService(crawlerService crawler.CrawlerService) NantunSportCenterService {
 	return NantunSportCenterService{
 		crawlerService: crawlerService,
 		Nantun_Url:     "https://nd01.xuanen.com.tw/BPMember/BPMemberLogin",
+		PaymentURL:     "https://nd01.xuanen.com.tw/BPMemberOrder/BPMemberOrder",
 	}
 }
 
@@ -83,8 +85,11 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 
 	// #endregion
 
+	bookCount := 0 // 預約成功數量
+
+	// #region 預約流程
 	for _, timeSlotCode := range cfg.TimeSlotCodes {
-		// 點擊確認按鈕
+		// 點擊預防詐騙確認按鈕
 		if err = page.MustElement("#Msg_Agree").Click(proto.InputMouseButtonLeft, 1); err != nil {
 			logger.Log.Error("無法點擊確認按鈕: " + err.Error())
 			return err
@@ -262,8 +267,34 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 			logger.Log.Error(fmt.Sprintf("預約時段 %v 失敗: %s", types.TimeSlotMap[timeSlotCode], err))
 			continue
 		}
+
+		bookCount++
 		// #endregion
 	}
+	// #endregion
+
+	// #region 點擊預防詐騙確認按鈕
+	if err = page.MustElement("#Msg_Agree").Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error("無法點擊確認按鈕: " + err.Error())
+		return err
+	}
+
+	logger.Log.Info("點擊確認按鈕")
+
+	// 等待頁面載入完成
+	page.MustWaitStable()
+	// #endregion
+
+	// #region 有預約成功，前往繳費網頁
+	if bookCount > 0 {
+		// 讀取網站
+		if err = page.Navigate(s.PaymentURL); err != nil {
+			return err
+		}
+	}
+	// #endregion
+
+	// 關閉瀏覽器
 	s.crawlerService.Close()
 	return nil
 }
