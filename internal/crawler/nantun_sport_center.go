@@ -35,74 +35,139 @@ func NewNantunSportCenterService(browserService browser.BrowserService) NantunSp
 
 // 爬蟲南屯運動中心
 func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
-
-	// #region 設定頁面
-	// 初始化瀏覽器
-	s.browserService.InitBrowser()
-	// 建立新頁面
-	page, err := s.browserService.GetPage()
+	page, err := s.initializePage()
 	if err != nil {
 		return err
 	}
 
-	// 設定網頁模式
-	s.browserService.SetWebMode(true)
-
-	// 讀取網站
-	if err = page.Navigate(s.Nantun_Url); err != nil {
+	if err := s.login(page, cfg); err != nil {
 		return err
 	}
 
-	// #endregion
-
-	// #region 登入
-	// 填寫身分證字號
-	if err = page.MustElement("#txt_Account").Input(cfg.ID); err != nil {
-		logger.Log.Error("無法輸入身分證字號: " + err.Error())
-		return err
-	}
-
-	logger.Log.Info("填寫身分證字號")
-
-	// 填寫密碼
-	if err = page.MustElement("#txt_Pass").Input(cfg.Password); err != nil {
-		logger.Log.Error("無法輸入密碼: " + err.Error())
-		return err
-	}
-
-	logger.Log.Info("填寫密碼")
-
-	// 點擊登入按鈕
-	if err = page.MustElement(".CssLoginBtn").Click(proto.InputMouseButtonLeft, 1); err != nil {
-		logger.Log.Error("無法點擊登入按鈕: " + err.Error())
-		return err
-	}
-
-	logger.Log.Info("點擊登入按鈕")
-
-	// 等待頁面載入完成
-	page.MustWaitStable()
-
-	// #endregion
-
-	bookCount := 0 // 預約成功數量
-
-	// #region 預約流程
+	bookCount := 0
 	for _, timeSlotCode := range cfg.TimeSlotCodes {
-		// 點擊預防詐騙確認按鈕
-		if err = page.MustElement("#Msg_Agree").Click(proto.InputMouseButtonLeft, 1); err != nil {
-			logger.Log.Error("無法點擊確認按鈕: " + err.Error())
+		if err := s.clickAgreeButton(page); err != nil {
 			return err
 		}
 
-		logger.Log.Info("點擊確認按鈕")
+		if err := s.selectLocationBooking(page); err != nil {
+			continue
+		}
 
-		// 等待頁面載入完成
-		page.MustWaitStable()
+		if err := s.selectBadminton(page); err != nil {
+			continue
+		}
 
-		// #region 點選場地預約
-		// 使用 JavaScript 觸發 onclick 事件
-		if _, err = page.Eval(`() => {
+		if err := s.setCheckboxAndProceed(page); err != nil {
+			return err
+		}
+
+		if err := s.proceedToBooking(page); err != nil {
+			return err
+		}
+
+		if err := s.selectDate(page, cfg.ChooseWeekday); err != nil {
+			return err
+		}
+
+		// 判斷時段，1-12 為上午，13-18 為下午，19-24 為晚上
+		var dayPeriod int
+		if timeSlotCode <= types.TimeSlot_11_12 {
+			dayPeriod = 1
+		} else if timeSlotCode <= types.TimeSlot_17_18 {
+			dayPeriod = 2
+		} else {
+			dayPeriod = 3
+		}
+
+		if err := s.selectTimeSlot(page, dayPeriod); err != nil {
+			continue
+		}
+
+		cleanSlots, err := s.getAllAvailableTimeSlots(page)
+		if err != nil {
+			continue
+		}
+
+		targetSlot := s.findAvailableCourtsByTimeSlot(cleanSlots, timeSlotCode)
+
+		if err := s.bookCourt(page, targetSlot); err != nil {
+			logger.Log.Error(fmt.Sprintf("預約時段 %v 失敗: %s", types.TimeSlotMap[timeSlotCode], err))
+			continue
+		}
+
+		bookCount++
+	}
+
+	if err := s.clickAgreeButton(page); err != nil {
+		return err
+	}
+
+	if bookCount > 0 {
+		if err := s.navigateToPayment(page); err != nil {
+			return err
+		}
+	}
+
+	s.browserService.Close()
+	return nil
+}
+
+// 初始化頁面設定
+func (s *NantunSportCenterService) initializePage() (*rod.Page, error) {
+	s.browserService.InitBrowser()
+	page, err := s.browserService.GetPage()
+	if err != nil {
+		return nil, err
+	}
+
+	s.browserService.SetWebMode(true)
+
+	if err = page.Navigate(s.Nantun_Url); err != nil {
+		return nil, err
+	}
+
+	return page, nil
+}
+
+// 執行登入
+func (s *NantunSportCenterService) login(page *rod.Page, cfg config.Config) error {
+	if err := page.MustElement("#txt_Account").Input(cfg.ID); err != nil {
+		logger.Log.Error("無法輸入身分證字號: " + err.Error())
+		return err
+	}
+	logger.Log.Info("填寫身分證字號")
+
+	if err := page.MustElement("#txt_Pass").Input(cfg.Password); err != nil {
+		logger.Log.Error("無法輸入密碼: " + err.Error())
+		return err
+	}
+	logger.Log.Info("填寫密碼")
+
+	if err := page.MustElement(".CssLoginBtn").Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error("無法點擊登入按鈕: " + err.Error())
+		return err
+	}
+	logger.Log.Info("點擊登入按鈕")
+
+	page.MustWaitStable()
+	return nil
+}
+
+// 點擊預防詐騙確認按鈕
+func (s *NantunSportCenterService) clickAgreeButton(page *rod.Page) error {
+	if err := page.MustElement("#Msg_Agree").Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error("無法點擊確認按鈕: " + err.Error())
+		return err
+	}
+	logger.Log.Info("點擊確認按鈕")
+	page.MustWaitStable()
+	return nil
+}
+
+// 點選場地預約
+func (s *NantunSportCenterService) selectLocationBooking(page *rod.Page) error {
+	if _, err := page.Eval(`() => {
 		const element = document.querySelector('#location');
 		if (element) {
 			next(3);
@@ -110,31 +175,28 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 		}
 		return false;
 	}`); err != nil {
-			logger.Log.Error("無法觸發場地預約按鈕的 onclick 事件: " + err.Error())
-			continue
-		}
+		logger.Log.Error("無法觸發場地預約按鈕的 onclick 事件: " + err.Error())
+		return err
+	}
+	logger.Log.Info("觸發場地預約按鈕的 onclick 事件")
+	page.MustWaitStable()
+	return nil
+}
 
-		logger.Log.Info("觸發場地預約按鈕的 onclick 事件")
+// 點擊羽球按鈕
+func (s *NantunSportCenterService) selectBadminton(page *rod.Page) error {
+	if err := page.MustElement(".CssAdImg[data-slick-index='0']").Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error("無法點擊羽球按鈕: " + err.Error())
+		return err
+	}
+	logger.Log.Info("點擊羽球按鈕")
+	page.MustWaitStable()
+	return nil
+}
 
-		// 等待頁面載入完成
-		page.MustWaitStable()
-		// #endregion
-
-		// #region 點擊羽球按鈕
-		if err = page.MustElement(".CssAdImg[data-slick-index='0']").Click(proto.InputMouseButtonLeft, 1); err != nil {
-			logger.Log.Error("無法點擊羽球按鈕: " + err.Error())
-			continue
-		}
-
-		logger.Log.Info("點擊羽球按鈕")
-
-		// 等待頁面載入完成
-		page.MustWaitStable()
-		// #endregion
-
-		// #region 設定勾選框狀態和觸發點擊事件
-		// 使用 JavaScript 設定勾選框狀態並觸發點擊事件
-		if _, err = page.Eval(`() => {
+// 設定勾選框狀態
+func (s *NantunSportCenterService) setCheckboxAndProceed(page *rod.Page) error {
+	if _, err := page.Eval(`() => {
 		const checkbox = document.querySelector('#isRememberAcc');
 		if (checkbox) {
 			checkbox.checked = true;
@@ -143,159 +205,90 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 		}
 		return false;
 	}`); err != nil {
-			logger.Log.Error("無法設定勾選框狀態和觸發點擊事件: " + err.Error())
-			return err
-		}
+		logger.Log.Error("無法設定勾選框狀態和觸發點擊事件: " + err.Error())
+		return err
+	}
+	logger.Log.Info("設定勾選框狀態和觸發點擊事件")
+	return nil
+}
 
-		logger.Log.Info("設定勾選框狀態和觸發點擊事件")
-		// #endregion
-
-		// #region 點選預約場地
-		// 使用 JavaScript 觸發 onclick 事件
-		if _, err = page.Eval(`() => {
+// 點選預約場地
+func (s *NantunSportCenterService) proceedToBooking(page *rod.Page) error {
+	if _, err := page.Eval(`() => {
 		next();
 		return true;
 	}`); err != nil {
-			logger.Log.Error("無法觸發預約場地按鈕的 onclick 事件: " + err.Error())
-			return err
-		}
-
-		logger.Log.Info("觸發預約場地按鈕的 onclick 事件")
-		// #endregion
-
-		// #region 點選日期對應按鈕
-		// 取得日期
-		weekdays := []string{}
-
-		// 選擇第一個 .datebox 中的所有 div 元素
-		firstDatebox := page.MustElement(".datebox")
-		dateElements := firstDatebox.MustElements("div")
-
-		// 遍歷每個元素取出文字，將順序儲存到weekdays
-		for _, element := range dateElements {
-			weekday := element.MustText()
-			weekdays = append(weekdays, weekday)
-		}
-
-		// 輸出結果
-		logger.Log.Info("取得的星期資訊:")
-		for i, day := range weekdays {
-			logger.Log.Info(fmt.Sprintf("%d: %s", i+1, day))
-		}
-
-		// 選擇對應日期
-		secondDatebox := page.MustElements("div.datebox")
-		if len(secondDatebox) < 2 {
-			logger.Log.Error("找不到第二個日期框")
-			return fmt.Errorf("找不到第二個日期框")
-		}
-
-		dateButtons := secondDatebox[1].MustElements("div")
-
-		// 檢查找到的按鈕數量是否足夠
-		if len(dateButtons) < len(weekdays) {
-			logger.Log.Error(fmt.Sprintf("日期按鈕數量不足，只有 %d 個按鈕", len(dateButtons)))
-			return fmt.Errorf("日期按鈕數量不足")
-		}
-
-		// 設定要選擇的星期幾
-		targetWeekday := cfg.ChooseWeekday
-
-		// 尋找對應的星期幾索引
-		weekdayIndex := -1
-		for i, day := range weekdays {
-			if day == targetWeekday {
-				weekdayIndex = i
-				break
-			}
-		}
-
-		// 檢查是否找到對應的星期
-		if weekdayIndex == -1 {
-			logger.Log.Error(fmt.Sprintf("找不到星期%s", targetWeekday))
-			return fmt.Errorf("找不到指定的星期")
-		}
-
-		logger.Log.Info(fmt.Sprintf("找到星期%s，索引為 %d", targetWeekday, weekdayIndex))
-
-		dateToClick := dateButtons[weekdayIndex]
-
-		// 打印要點選的日期
-		dateText := dateToClick.MustText()
-		logger.Log.Info(fmt.Sprintf("選擇的日期是: %s", dateText))
-
-		// 執行點選
-		if err = dateToClick.Click(proto.InputMouseButtonLeft, 1); err != nil {
-			logger.Log.Error(fmt.Sprintf("點選日期失敗: %s", err))
-			return err
-		}
-
-		// 等待頁面載入完成
-		page.MustWaitStable()
-		logger.Log.Info("日期點選成功")
-		// #endregion
-
-		// #region 預約場地
-		// 根據時段代碼決定選擇上午、下午或晚上
-		var dayPeriod int
-		if timeSlotCode <= types.TimeSlot_11_12 {
-			dayPeriod = 1 // 上午
-		} else if timeSlotCode <= types.TimeSlot_17_18 {
-			dayPeriod = 2 // 下午
-		} else {
-			dayPeriod = 3 // 晚上
-		}
-
-		// 選擇時段（上午、下午、晚上）
-		if err = s.selectTimeSlot(page, dayPeriod); err != nil {
-			logger.Log.Error("選擇時段失敗: " + err.Error())
-			continue
-		}
-
-		// 取得所有可預約時段資訊
-		cleanSlots, err := s.getAllAvailableTimeSlots(page)
-		if err != nil {
-			logger.Log.Error("取得可預約時段資訊失敗: " + err.Error())
-			continue
-		}
-
-		// 篩選出指定要預約的場地
-		targetSlot := s.findAvailableCourtsByTimeSlot(cleanSlots, timeSlotCode)
-
-		// 預約場地
-		if err = s.bookCourt(page, targetSlot); err != nil {
-			logger.Log.Error(fmt.Sprintf("預約時段 %v 失敗: %s", types.TimeSlotMap[timeSlotCode], err))
-			continue
-		}
-
-		bookCount++
-		// #endregion
+		logger.Log.Error("無法觸發預約場地按鈕的 onclick 事件: " + err.Error())
+		return err
 	}
-	// #endregion
+	logger.Log.Info("觸發預約場地按鈕的 onclick 事件")
+	return nil
+}
 
-	// #region 點擊預防詐騙確認按鈕
-	if err = page.MustElement("#Msg_Agree").Click(proto.InputMouseButtonLeft, 1); err != nil {
-		logger.Log.Error("無法點擊確認按鈕: " + err.Error())
+// 選擇日期
+func (s *NantunSportCenterService) selectDate(page *rod.Page, targetWeekday string) error {
+	weekdays := []string{}
+
+	firstDatebox := page.MustElement(".datebox")
+	dateElements := firstDatebox.MustElements("div")
+
+	for _, element := range dateElements {
+		weekday := element.MustText()
+		weekdays = append(weekdays, weekday)
+	}
+
+	logger.Log.Info("取得的星期資訊:")
+	for i, day := range weekdays {
+		logger.Log.Info(fmt.Sprintf("%d: %s", i+1, day))
+	}
+
+	secondDatebox := page.MustElements("div.datebox")
+	if len(secondDatebox) < 2 {
+		logger.Log.Error("找不到第二個日期框")
+		return fmt.Errorf("找不到第二個日期框")
+	}
+
+	dateButtons := secondDatebox[1].MustElements("div")
+	if len(dateButtons) < len(weekdays) {
+		logger.Log.Error(fmt.Sprintf("日期按鈕數量不足，只有 %d 個按鈕", len(dateButtons)))
+		return fmt.Errorf("日期按鈕數量不足")
+	}
+
+	weekdayIndex := -1
+	for i, day := range weekdays {
+		if day == targetWeekday {
+			weekdayIndex = i
+			break
+		}
+	}
+
+	if weekdayIndex == -1 {
+		logger.Log.Error(fmt.Sprintf("找不到星期%s", targetWeekday))
+		return fmt.Errorf("找不到指定的星期")
+	}
+
+	logger.Log.Info(fmt.Sprintf("找到星期%s，索引為 %d", targetWeekday, weekdayIndex))
+
+	dateToClick := dateButtons[weekdayIndex]
+	dateText := dateToClick.MustText()
+	logger.Log.Info(fmt.Sprintf("選擇的日期是: %s", dateText))
+
+	if err := dateToClick.Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error(fmt.Sprintf("點選日期失敗: %s", err))
 		return err
 	}
 
-	logger.Log.Info("點擊確認按鈕")
-
-	// 等待頁面載入完成
 	page.MustWaitStable()
-	// #endregion
+	logger.Log.Info("日期點選成功")
+	return nil
+}
 
-	// #region 有預約成功，前往繳費網頁
-	if bookCount > 0 {
-		// 讀取網站
-		if err = page.Navigate(s.paymentURL); err != nil {
-			return err
-		}
+// 前往繳費頁面
+func (s *NantunSportCenterService) navigateToPayment(page *rod.Page) error {
+	if err := page.Navigate(s.paymentURL); err != nil {
+		return err
 	}
-	// #endregion
-
-	// 關閉瀏覽器
-	s.browserService.Close()
+	page.MustWaitStable()
 	return nil
 }
 
