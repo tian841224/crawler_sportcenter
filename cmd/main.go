@@ -15,8 +15,11 @@ func main() {
 
 	// 載入設定檔
 	cfg := config.LoadConfig()
+	logger.Log.Info("載入設定檔")
 
+	// 初始化瀏覽器
 	browser := browser.NewBrowserService()
+	logger.Log.Info("初始化瀏覽器")
 	nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
-	nantunSportCenterService.CrawlerNantun(cfg)
+	nantunSportCenterService.QuickCrawlerNantun(cfg)
 }

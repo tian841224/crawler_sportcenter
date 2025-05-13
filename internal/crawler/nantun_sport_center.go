@@ -33,6 +33,66 @@ func NewNantunSportCenterService(browserService browser.BrowserService) NantunSp
 	}
 }
 
+// 快速預定場地
+func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
+	page, err := s.initializePage()
+	if err != nil {
+		return err
+	}
+
+	if err := s.login(page, cfg); err != nil {
+		return err
+	}
+
+	for _, timeSlotCode := range cfg.TimeSlotCodes {
+
+		// 判斷時段，1-12 為上午，13-18 為下午，19-24 為晚上
+		var dayPeriod int
+		if timeSlotCode <= types.TimeSlot_11_12 {
+			dayPeriod = 1
+		} else if timeSlotCode <= types.TimeSlot_17_18 {
+			dayPeriod = 2
+		} else {
+			dayPeriod = 3
+		}
+
+		if err := s.clickAgreeButton(page); err != nil {
+			return err
+		}
+
+		if err := s.selectLocationBooking(page); err != nil {
+			return err
+		}
+
+		if err := s.selectBadminton(page); err != nil {
+			return err
+		}
+
+		if err := s.setCheckboxAndProceed(page); err != nil {
+			return err
+		}
+
+		if err := s.proceedToBooking(page); err != nil {
+			return err
+		}
+
+		if err := s.selectTimeSlot(page, dayPeriod); err != nil {
+			return err
+		}
+
+		if err := s.fastSelectLastDate(page, timeSlotCode); err != nil {
+			return err
+		}
+
+		if err := s.fastBookCourt(page, 1); err != nil {
+			logger.Log.Error(fmt.Sprintf("預約時段 %v 失敗: %s", types.TimeSlotMap[timeSlotCode], err))
+			return err
+		}
+	}
+	s.browserService.Close()
+	return nil
+}
+
 // 爬蟲南屯運動中心
 func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 	page, err := s.initializePage()
@@ -208,6 +268,8 @@ func (s *NantunSportCenterService) setCheckboxAndProceed(page *rod.Page) error {
 		logger.Log.Error("無法設定勾選框狀態和觸發點擊事件: " + err.Error())
 		return err
 	}
+
+	page.MustWaitStable()
 	logger.Log.Info("設定勾選框狀態和觸發點擊事件")
 	return nil
 }
@@ -221,6 +283,8 @@ func (s *NantunSportCenterService) proceedToBooking(page *rod.Page) error {
 		logger.Log.Error("無法觸發預約場地按鈕的 onclick 事件: " + err.Error())
 		return err
 	}
+
+	page.MustWaitStable()
 	logger.Log.Info("觸發預約場地按鈕的 onclick 事件")
 	return nil
 }
@@ -425,7 +489,6 @@ func (s *NantunSportCenterService) getAllAvailableTimeSlots(page *rod.Page) ([]t
 		})
 	}
 	logger.Log.Info(fmt.Sprintf("找到 %d 個可預約時段:", len(cleanSlots)))
-
 	return cleanSlots, nil
 }
 
@@ -441,7 +504,6 @@ func (s *NantunSportCenterService) findAvailableCourtsByTimeSlot(slots []types.C
 	}
 
 	logger.Log.Info(fmt.Sprintf("找到 %d 個 %v 點可預約時段:", len(availableCourts), targetTime))
-
 	return availableCourts
 }
 
@@ -549,4 +611,200 @@ func (s *NantunSportCenterService) bookCourt(page *rod.Page, targetSlot []types.
 	}
 
 	return fmt.Errorf("所有場地預約嘗試均失敗")
+}
+
+// 快速點選最新日期
+func (s *NantunSportCenterService) fastSelectLastDate(page *rod.Page, timeSlotCode types.TimeSlotCode) error {
+
+	secondDatebox := page.MustElements("div.datebox")
+	if len(secondDatebox) < 2 {
+		logger.Log.Error("找不到第二個日期框")
+		return fmt.Errorf("找不到第二個日期框")
+	}
+
+	dateButtons := secondDatebox[1].MustElements("div")
+	dateToClick := dateButtons[6]
+
+	if err := dateToClick.Click(proto.InputMouseButtonLeft, 1); err != nil {
+		logger.Log.Error(fmt.Sprintf("點選日期失敗: %s", err))
+		return err
+	}
+
+	// var err error
+	// s.cleanSlots, err = s.getAllAvailableTimeSlots(page)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// s.targetSlot = s.findAvailableCourtsByTimeSlot(s.cleanSlots, timeSlotCode)
+
+	// 使用 JavaScript 查找並點擊最後一個可用日期
+	script := `() => {
+	    // 先嘗試找帶有 selectweek class 的日期按鈕
+	    let dateButton = document.querySelector('div.selectweek[onclick*="SelectDate"]');
+	    if (!dateButton) {
+	        // 如果沒有找到，則查找普通的日期按鈕
+	        const allDateButtons = Array.from(document.querySelectorAll('div[onclick*="SelectDate"]'));
+	        if (allDateButtons.length > 0) {
+	            dateButton = allDateButtons[allDateButtons.length - 1];
+	        }
+	    }
+
+	    if (dateButton) {
+	        // 從 onclick 屬性中提取日期
+	        const onclickAttr = dateButton.getAttribute('onclick');
+	        const dateMatch = onclickAttr.match(/'(\d{4}-\d{2}-\d{2})'/);
+	        if (dateMatch) {
+	            SelectDate(dateMatch[1]);
+	            return true;
+	        }
+	    }
+	    return false;
+	}`
+
+	// for {
+	// 	currentTime := time.Now()
+	// 	if currentTime.Hour() == 12 { // 12 點後停止點擊
+	// 		break
+	// 	}
+	// if currentTime.Hour() == 12 && currentTime.Minute() == 59 { // 12:59分後開始點
+	// 執行腳本
+	result, err := page.Eval(script)
+	if err != nil {
+		logger.Log.Error(fmt.Sprintf("執行日期選擇腳本失敗: %s", err))
+		return err
+	}
+
+	if !result.Value.Bool() {
+		logger.Log.Error("找不到可點擊的日期按鈕")
+		return fmt.Errorf("找不到可點擊的日期按鈕")
+	}
+
+	// 等待頁面穩定
+	page.MustWaitStable()
+	// }
+	// }
+
+	logger.Log.Info("日期點選成功")
+	return nil
+}
+
+// 快速預約場地
+// 預約指定場地
+func (s *NantunSportCenterService) fastBookCourt(page *rod.Page, buttonIndex int) error {
+	// 使用 JavaScript 找到所有預約按鈕
+	script := `() => {
+        const buttons = document.querySelectorAll('.listbtn[onclick*="DoSubmit2"]');
+        return Array.from(buttons).map(btn => btn.getAttribute('onclick'));
+    }`
+
+	// 執行腳本獲取所有按鈕的 onclick 屬性
+	result, err := page.Eval(script)
+	if err != nil {
+		logger.Log.Error(fmt.Sprintf("獲取預約按鈕失敗: %s", err))
+		return err
+	}
+
+	// 將結果轉換為字符串切片
+	var buttons []string
+	if err := result.Value.Unmarshal(&buttons); err != nil {
+		logger.Log.Error(fmt.Sprintf("解析按鈕資訊失敗: %s", err))
+		return err
+	}
+
+	// 您可以指定要點擊第幾個按鈕（例如第一個按鈕索引為 0）
+	if buttonIndex >= len(buttons) {
+		return fmt.Errorf("指定的按鈕索引 %d 超出範圍，總共有 %d 個按鈕", buttonIndex, len(buttons))
+	}
+
+	// 從選定按鈕的 onclick 屬性中提取參數
+	selectedButton := buttons[buttonIndex]
+	re := regexp.MustCompile(`DoSubmit2\((\d+),['"](\S+)['"],(\d+),(\d+)\)`)
+	matches := re.FindStringSubmatch(selectedButton)
+	if len(matches) < 5 {
+		return fmt.Errorf("無法解析選定按鈕的預約參數")
+	}
+
+	// 執行預約
+	bookScript := fmt.Sprintf(`() => {
+        try {
+            DoSubmit2(%s,'%s',%s,%s);
+            return true;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    }`, matches[1], matches[2], matches[3], matches[4])
+
+	// 執行預約腳本
+	bookResult, err := page.Eval(bookScript)
+	if err != nil {
+		logger.Log.Error(fmt.Sprintf("執行預約腳本失敗: %s", err))
+		return err
+	}
+
+	if !bookResult.Value.Bool() {
+		return fmt.Errorf("預約失敗")
+	}
+
+	// 等待頁面跳轉或更新
+	page.MustWaitStable()
+
+	// 檢查是否跳轉到預約確認頁面
+	currentURL := page.MustInfo().URL
+	if strings.Contains(currentURL, "tFlag=2") {
+		// 點擊確認按鈕
+		confirmScript := fmt.Sprintf(`() => {
+            try {
+                DoSubmit3('%s');
+                return true;
+            } catch (e) {
+                console.error(e);
+                return false;
+            }
+        }`, matches[2])
+
+		// 執行確認按鈕點擊
+		confirmResult, err := page.Eval(confirmScript)
+		if err != nil {
+			logger.Log.Error(fmt.Sprintf("執行確認按鈕點擊失敗: %s", err))
+			return err
+		}
+
+		if !confirmResult.Value.Bool() {
+			return fmt.Errorf("確認按鈕點擊失敗")
+		}
+
+		// 等待最終確認頁面載入
+		page.MustWaitStable()
+		logger.Log.Info("成功預約場地")
+
+		// 返回首頁
+		script := `() => {
+            try {
+                window.location = '/BPHome/BPHome';
+                return true;
+            } catch (e) {
+                console.error(e);
+                return false;
+            }
+        }`
+
+		result, err := page.Eval(script)
+		if err != nil {
+			logger.Log.Error(fmt.Sprintf("執行返回首頁腳本失敗: %s", err))
+			return err
+		}
+
+		if !result.Value.Bool() {
+			return fmt.Errorf("返回首頁失敗")
+		}
+
+		page.MustWaitStable()
+		logger.Log.Info("成功返回首頁")
+
+		return nil
+	}
+
+	return fmt.Errorf("預約流程未完成")
 }
