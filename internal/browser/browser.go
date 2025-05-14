@@ -42,7 +42,7 @@ func (s *BrowserService) InitBrowser() error {
 
 	// 初始化瀏覽器
 	browser := rod.New().ControlURL(path).MustConnect()
-	stealth.MustPage(browser)
+
 	s.browser = browser
 
 	return nil
@@ -51,11 +51,9 @@ func (s *BrowserService) InitBrowser() error {
 // 取得頁面
 func (s *BrowserService) GetPage() (*rod.Page, error) {
 	// 建立新頁面
-	page := s.browser.MustPage("")
-	s.page = page
+	s.page = stealth.MustPage(s.browser)
 
-	// 修正後的 User-Agent 設定
-	err := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{
+	err := s.page.SetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent:      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
 		AcceptLanguage: "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
 	})
@@ -66,7 +64,7 @@ func (s *BrowserService) GetPage() (*rod.Page, error) {
 	}
 
 	// 注入反檢測腳本
-	_, err = page.Eval(`() => {
+	_, err = s.page.Eval(`() => {
 		Object.defineProperty(navigator, 'webdriver', { get: () => false });
 		Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
 		Object.defineProperty(navigator, 'languages', { get: () => ['zh-TW', 'zh', 'en-US', 'en'] });
@@ -78,7 +76,7 @@ func (s *BrowserService) GetPage() (*rod.Page, error) {
 	}
 
 	// 注入反彈窗腳本
-	_, err = page.Eval(`() => {
+	_, err = s.page.Eval(`() => {
 			window.alert = () => {};
 			window.confirm = () => true;
 			window.prompt = () => null;
@@ -89,7 +87,7 @@ func (s *BrowserService) GetPage() (*rod.Page, error) {
 		return nil, err
 	}
 
-	return page, nil
+	return s.page, nil
 }
 
 // 關閉瀏覽器
