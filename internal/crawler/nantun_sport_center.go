@@ -44,17 +44,7 @@ func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
 		return err
 	}
 
-	for _, timeSlotCode := range cfg.TimeSlotCodes {
-
-		// 判斷時段，1-12 為上午，13-18 為下午，19-24 為晚上
-		var dayPeriod int
-		if timeSlotCode <= types.TimeSlot_11_12 {
-			dayPeriod = 1
-		} else if timeSlotCode <= types.TimeSlot_17_18 {
-			dayPeriod = 2
-		} else {
-			dayPeriod = 3
-		}
+	for _, buttonIndex := range cfg.ButtonIndex {
 
 		if err := s.clickAgreeButton(page); err != nil {
 			return err
@@ -76,16 +66,15 @@ func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
 			return err
 		}
 
-		if err := s.selectTimeSlot(page, dayPeriod); err != nil {
+		if err := s.selectTimeSlot(page, cfg.DayPeriod); err != nil {
 			return err
 		}
 
-		if err := s.fastSelectLastDate(page, timeSlotCode); err != nil {
+		if err := s.fastSelectLastDate(page); err != nil {
 			return err
 		}
 
-		if err := s.fastBookCourt(page, 1); err != nil {
-			logger.Log.Error(fmt.Sprintf("預約時段 %v 失敗: %s", types.TimeSlotMap[timeSlotCode], err))
+		if err := s.fastBookCourt(page, buttonIndex); err != nil {
 			return err
 		}
 	}
@@ -614,7 +603,7 @@ func (s *NantunSportCenterService) bookCourt(page *rod.Page, targetSlot []types.
 }
 
 // 快速點選最新日期
-func (s *NantunSportCenterService) fastSelectLastDate(page *rod.Page, timeSlotCode types.TimeSlotCode) error {
+func (s *NantunSportCenterService) fastSelectLastDate(page *rod.Page) error {
 
 	secondDatebox := page.MustElements("div.datebox")
 	if len(secondDatebox) < 2 {
@@ -629,14 +618,6 @@ func (s *NantunSportCenterService) fastSelectLastDate(page *rod.Page, timeSlotCo
 		logger.Log.Error(fmt.Sprintf("點選日期失敗: %s", err))
 		return err
 	}
-
-	// var err error
-	// s.cleanSlots, err = s.getAllAvailableTimeSlots(page)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// s.targetSlot = s.findAvailableCourtsByTimeSlot(s.cleanSlots, timeSlotCode)
 
 	// 使用 JavaScript 查找並點擊最後一個可用日期
 	script := `() => {
@@ -662,28 +643,28 @@ func (s *NantunSportCenterService) fastSelectLastDate(page *rod.Page, timeSlotCo
 	    return false;
 	}`
 
-	// for {
-	// 	currentTime := time.Now()
-	// 	if currentTime.Hour() == 12 { // 12 點後停止點擊
-	// 		break
-	// 	}
-	// if currentTime.Hour() == 12 && currentTime.Minute() == 59 { // 12:59分後開始點
-	// 執行腳本
-	result, err := page.Eval(script)
-	if err != nil {
-		logger.Log.Error(fmt.Sprintf("執行日期選擇腳本失敗: %s", err))
-		return err
-	}
+	for {
+		currentTime := time.Now()
+		if currentTime.Hour() == 12 { // 12 點後停止點擊
+			break
+		}
+		if currentTime.Hour() == 12 && currentTime.Minute() == 59 { // 12:59分後開始點
+			// 執行腳本
+			result, err := page.Eval(script)
+			if err != nil {
+				logger.Log.Error(fmt.Sprintf("執行日期選擇腳本失敗: %s", err))
+				return err
+			}
 
-	if !result.Value.Bool() {
-		logger.Log.Error("找不到可點擊的日期按鈕")
-		return fmt.Errorf("找不到可點擊的日期按鈕")
-	}
+			if !result.Value.Bool() {
+				logger.Log.Error("找不到可點擊的日期按鈕")
+				return fmt.Errorf("找不到可點擊的日期按鈕")
+			}
 
-	// 等待頁面穩定
-	page.MustWaitStable()
-	// }
-	// }
+			// 等待頁面穩定
+			page.MustWaitStable()
+		}
+	}
 
 	logger.Log.Info("日期點選成功")
 	return nil

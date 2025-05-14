@@ -13,6 +13,8 @@ import (
 type Config struct {
 	ChooseWeekday string
 	TimeSlotCodes []types.TimeSlotCode // 改為切片以支援多個時段
+	DayPeriod    int
+	ButtonIndex  []int
 	ID            string
 	Password      string
 }
@@ -42,8 +44,34 @@ func LoadConfig() Config {
 	cfg := Config{
 		ChooseWeekday: os.Getenv("CHOOSE_WEEKDAY"),
 		TimeSlotCodes: timeSlotCodes,
-		ID:            os.Getenv("ID"),
-		Password:      os.Getenv("Password"),
+		DayPeriod: func() int {
+			period, err := strconv.Atoi(os.Getenv("DAY_PERIOD"))
+			if err != nil {
+				return 1 // Default value if conversion fails
+			}
+			return period
+		}(),
+		ButtonIndex: func() []int {
+			indexStr := os.Getenv("BUTTON_INDEX")
+			if indexStr == "" {
+				return []int{} 
+			}
+			
+			// 用逗號分隔字串
+			indexStrArray := strings.Split(indexStr, ",")
+			indexArray := make([]int, 0, len(indexStrArray))
+			
+			// 轉換每個字串為整數
+			for _, str := range indexStrArray {
+				num, err := strconv.Atoi(strings.TrimSpace(str))
+				if err == nil {
+					indexArray = append(indexArray, num)
+				}
+			}
+			return indexArray
+		}(),
+		ID:       os.Getenv("ID"),
+		Password: os.Getenv("Password"),
 	}
 
 	return cfg
