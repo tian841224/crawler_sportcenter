@@ -1,6 +1,7 @@
 package main
 
 import (
+	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
 	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
@@ -21,5 +22,14 @@ func main() {
 	browser := browser.NewBrowserService()
 	logger.Log.Info("初始化瀏覽器")
 	nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
-	nantunSportCenterService.QuickCrawlerNantun(cfg)
+	nantunSportCenterService.CrawlerNantun(cfg)
+
+	botService := tgbot.NewTGBotService(cfg)
+    handler := tgbot.NewMessageHandler(botService)
+    
+    // 設置消息處理
+    botService.HandleMessage(handler.HandleUpdate)
+    
+    // 開始接收消息
+    botService.StartReceiveMessage()
 }

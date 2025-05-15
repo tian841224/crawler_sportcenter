@@ -3,6 +3,7 @@ module github.com/tian841224/crawler_sportcenter
 go 1.24.3
 
 require (
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect

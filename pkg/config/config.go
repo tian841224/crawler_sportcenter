@@ -11,12 +11,16 @@ import (
 )
 
 type Config struct {
-	ChooseWeekday string
-	TimeSlotCodes []types.TimeSlotCode // 改為切片以支援多個時段
+	ChooseWeekday         string
+	TimeSlotCodes         []types.TimeSlotCode // 改為切片以支援多個時段
 	DayPeriod    int
 	ButtonIndex  []int
-	ID            string
-	Password      string
+	ID                    string
+	Password              string
+	TG_Bot_Token          string
+	TG_Bot_Webhook_Domain string
+	// TG_Bot_Webhook_Port   string
+	TG_Bot_Secret_Token   string
 }
 
 func LoadConfig() Config {
@@ -44,6 +48,12 @@ func LoadConfig() Config {
 	cfg := Config{
 		ChooseWeekday: os.Getenv("CHOOSE_WEEKDAY"),
 		TimeSlotCodes: timeSlotCodes,
+		ID:            os.Getenv("ID"),
+		Password:      os.Getenv("Password"),
+		TG_Bot_Token:          os.Getenv("TG_Bot_Token"),
+		TG_Bot_Webhook_Domain: os.Getenv("TG_Bot_Webhook_Domain"),
+		// TG_Bot_Webhook_Port:   os.Getenv("TG_Bot_Webhook_Port"),
+		TG_Bot_Secret_Token:   os.Getenv("TG_Bot_Secret_Token"),
 		DayPeriod: func() int {
 			period, err := strconv.Atoi(os.Getenv("DAY_PERIOD"))
 			if err != nil {
@@ -70,8 +80,6 @@ func LoadConfig() Config {
 			}
 			return indexArray
 		}(),
-		ID:       os.Getenv("ID"),
-		Password: os.Getenv("Password"),
 	}
 
 	return cfg
