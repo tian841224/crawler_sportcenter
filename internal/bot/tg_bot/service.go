@@ -29,9 +29,31 @@ func NewTGBotService(cfg config.Config) *TGBotService {
 		return nil
 	}
 
+	_, err = bot.Request(tgbotapi.DeleteWebhookConfig{
+		DropPendingUpdates: true,
+	})
+
+	if cfg.TG_Bot_Webhook_Domain != "" {
+		// 設定 webhook
+		webhookURL := cfg.TG_Bot_Webhook_Domain
+		webhookConfig, err := tgbotapi.NewWebhook(webhookURL)
+		if err != nil {
+			logger.Log.Error("設定 webhook 失敗: " + err.Error())
+			return nil
+		}
+
+		_, err = bot.Request(webhookConfig)
+		if err != nil {
+			logger.Log.Error("設定 webhook 失敗: " + err.Error())
+			return nil
+		}
+		logger.Log.Info("成功設定 webhook: " + webhookURL)
+	} else {
+		logger.Log.Info("使用輪詢模式")
+	}
+
 	// debug 模式
 	bot.Debug = true
-
 	return &TGBotService{
 		cfg: cfg,
 		bot: bot,

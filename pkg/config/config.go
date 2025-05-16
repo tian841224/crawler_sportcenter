@@ -13,14 +13,14 @@ import (
 type Config struct {
 	ChooseWeekday         string
 	TimeSlotCodes         []types.TimeSlotCode // 改為切片以支援多個時段
-	DayPeriod    int
-	ButtonIndex  []int
+	DayPeriod             int
+	ButtonIndex           []int
 	ID                    string
 	Password              string
 	TG_Bot_Token          string
 	TG_Bot_Webhook_Domain string
 	// TG_Bot_Webhook_Port   string
-	TG_Bot_Secret_Token   string
+	// TG_Bot_Secret_Token string
 }
 
 func LoadConfig() Config {
@@ -46,14 +46,14 @@ func LoadConfig() Config {
 
 	// 從環境變數中獲取值
 	cfg := Config{
-		ChooseWeekday: os.Getenv("CHOOSE_WEEKDAY"),
-		TimeSlotCodes: timeSlotCodes,
-		ID:            os.Getenv("ID"),
-		Password:      os.Getenv("Password"),
-		TG_Bot_Token:          os.Getenv("TG_Bot_Token"),
-		TG_Bot_Webhook_Domain: os.Getenv("TG_Bot_Webhook_Domain"),
+		ChooseWeekday:         os.Getenv("CHOOSE_WEEKDAY"),
+		TimeSlotCodes:         timeSlotCodes,
+		ID:                    os.Getenv("ID"),
+		Password:              os.Getenv("Password"),
+		TG_Bot_Token:          os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TG_Bot_Webhook_Domain: os.Getenv("TELEGRAM_BOT_WEBHOOK_DOMAIN"),
 		// TG_Bot_Webhook_Port:   os.Getenv("TG_Bot_Webhook_Port"),
-		TG_Bot_Secret_Token:   os.Getenv("TG_Bot_Secret_Token"),
+		// TG_Bot_Secret_Token: os.Getenv("TELEGRAM_BOT_SECRET_TOKEN"),
 		DayPeriod: func() int {
 			period, err := strconv.Atoi(os.Getenv("DAY_PERIOD"))
 			if err != nil {
@@ -64,13 +64,13 @@ func LoadConfig() Config {
 		ButtonIndex: func() []int {
 			indexStr := os.Getenv("BUTTON_INDEX")
 			if indexStr == "" {
-				return []int{} 
+				return []int{}
 			}
-			
+
 			// 用逗號分隔字串
 			indexStrArray := strings.Split(indexStr, ",")
 			indexArray := make([]int, 0, len(indexStrArray))
-			
+
 			// 轉換每個字串為整數
 			for _, str := range indexStrArray {
 				num, err := strconv.Atoi(strings.TrimSpace(str))
