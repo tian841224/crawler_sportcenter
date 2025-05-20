@@ -1,17 +1,17 @@
 package tgbot
 
 import (
-	"fmt"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 )
 
 type TGBotInterface interface {
-	SendMessage(chatID int64, text string) error
+	SendMessage(chatID int64, text string)
+	SendeKeyboardMessage(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup)
 	StartReceiveMessage()
 	HandleMessage(handler func(update tgbotapi.Update))
+	Request(request tgbotapi.CallbackConfig)
 }
 
 var _ TGBotInterface = (*TGBotService)(nil)
@@ -60,21 +60,6 @@ func NewTGBotService(cfg config.Config) *TGBotService {
 	}
 }
 
-func (s *TGBotService) SendMessage(chatID int64, text string) error {
-	if s.bot == nil {
-		return fmt.Errorf("bot not initialized")
-	}
-
-	msg := tgbotapi.NewMessage(chatID, text)
-	_, err := s.bot.Send(msg)
-	if err != nil {
-		logger.Log.Error("發送訊息失敗: " + err.Error())
-		return err
-	}
-
-	return nil
-}
-
 // StartReceiveMessage 開始接收消息
 func (s *TGBotService) StartReceiveMessage() {
 	if s.bot == nil {
@@ -102,4 +87,36 @@ func (s *TGBotService) StartReceiveMessage() {
 // HandleMessage 設置消息處理函數
 func (s *TGBotService) HandleMessage(handler func(update tgbotapi.Update)) {
 	s.messageHandler = handler
+}
+
+func (s *TGBotService) SendMessage(chatID int64, text string) {
+	if s.bot == nil {
+		logger.Log.Error("bot not initialized")
+	}
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	_, err := s.bot.Send(msg)
+	if err != nil {
+		logger.Log.Error("發送訊息失敗: " + err.Error())
+	}
+
+}
+
+func (s *TGBotService) SendeKeyboardMessage(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) {
+	if s.bot == nil {
+		logger.Log.Error("bot not initialized")
+	}
+
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyMarkup = keyboard
+	_, err := s.bot.Send(msg)
+	if err != nil {
+		logger.Log.Error("發送訊息失敗: " + err.Error())
+	}
+}
+
+func (s *TGBotService) Request(request tgbotapi.CallbackConfig) {
+	if _, err := s.bot.Request(request); err != nil {
+		logger.Log.Error("回覆 callback 失敗：" + err.Error())
+	}
 }

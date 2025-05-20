@@ -1,17 +1,25 @@
 package tgbot
 
 import (
+	"strconv"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/tian841224/crawler_sportcenter/internal/crawler"
+	"github.com/tian841224/crawler_sportcenter/internal/types"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 )
 
 type MessageHandler struct {
-	bot TGBotInterface
+	bot                   TGBotInterface
+	nantun_sport          crawler.NantunSportCenterBotInterface
+	userSelectionDate     string
+	userSelectionTimeSlot string
 }
 
-func NewMessageHandler(bot TGBotInterface) *MessageHandler {
+func NewMessageHandler(bot TGBotInterface, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
 	return &MessageHandler{
-		bot: bot,
+		bot:          bot,
+		nantun_sport: nantun_sport,
 	}
 }
 
@@ -25,7 +33,8 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 	}
 }
 
-// 處理文字消息
+// #region 處理所有格式訊息
+// 處理文字訊息
 func (h *MessageHandler) handleMessage(message *tgbotapi.Message) {
 	// 根據消息內容處理
 	switch message.Text {
@@ -36,28 +45,186 @@ func (h *MessageHandler) handleMessage(message *tgbotapi.Message) {
 	}
 }
 
-// 處理按鈕回調
+// 處理按鈕回饋
 func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	// 處理按鈕回調的邏輯
 	logger.Log.Info("收到按鈕回調：" + callback.Data)
 
-	// 這裡可以根據 callback.Data 來處理不同的按鈕操作
+	// 根據 callback.Data 來處理不同的按鈕操作
+	switch callback.Data {
+	case "nantun_sport":
+		text := "選擇訂閱時間"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("日", "date_0"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("一", "date_1"),
+				tgbotapi.NewInlineKeyboardButtonData("二", "date_2"),
+				tgbotapi.NewInlineKeyboardButtonData("三", "date_3"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("四", "date_4"),
+				tgbotapi.NewInlineKeyboardButtonData("五", "date_5"),
+				tgbotapi.NewInlineKeyboardButtonData("六", "date_6"),
+			),
+		)
+		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
+	// 選擇訂閱時段
+	case "date_0", "date_1", "date_2", "date_3", "date_4", "date_5", "date_6":
+		// Convert numeric day to Chinese character
+		dayMap := map[string]string{
+			"0": "日",
+			"1": "一",
+			"2": "二",
+			"3": "三",
+			"4": "四",
+			"5": "五",
+			"6": "六",
+		}
+		h.userSelectionDate = dayMap[callback.Data[5:]]
+		// 處理按鈕回調的邏輯
+		logger.Log.Info("收到按鈕回調：" + h.userSelectionDate)
+		text := "選擇訂閱時間"
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("6:00-7:00", "time_slot_1"),
+				tgbotapi.NewInlineKeyboardButtonData("7:00-8:00", "time_slot_2"),
+				tgbotapi.NewInlineKeyboardButtonData("8:00-9:00", "time_slot_3"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("9:00-10:00", "time_slot_4"),
+				tgbotapi.NewInlineKeyboardButtonData("10:00-11:00", "time_slot_5"),
+				tgbotapi.NewInlineKeyboardButtonData("11:00-12:00", "time_slot_6"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("12:00-13:00", "time_slot_7"),
+				tgbotapi.NewInlineKeyboardButtonData("13:00-14:00", "time_slot_8"),
+				tgbotapi.NewInlineKeyboardButtonData("14:00-15:00", "time_slot_9"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("15:00-16:00", "time_slot_10"),
+				tgbotapi.NewInlineKeyboardButtonData("16:00-17:00", "time_slot_11"),
+				tgbotapi.NewInlineKeyboardButtonData("17:00-18:00", "time_slot_12"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("18:00-19:00", "time_slot_13"),
+				tgbotapi.NewInlineKeyboardButtonData("19:00-20:00", "time_slot_14"),
+				tgbotapi.NewInlineKeyboardButtonData("20:00-21:00", "time_slot_15"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("21:00-22:00", "time_slot_16"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+			),
+		)
+		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
+	case "time_slot_1", "time_slot_2", "time_slot_3", "time_slot_4", "time_slot_5", "time_slot_6", "time_slot_7", "time_slot_8", "time_slot_9", "time_slot_10", "time_slot_11", "time_slot_12", "time_slot_13", "time_slot_14", "time_slot_15", "time_slot_16":
+		// Extract time slot number from callback data
+		h.userSelectionTimeSlot = callback.Data[10:]
+		num, _ := strconv.Atoi(h.userSelectionTimeSlot)
+
+		// Log user's time slot selection
+		logger.Log.Info("User selected time slot: " + h.userSelectionTimeSlot)
+
+		// Get available slots for selected date and time
+		availableSlots, err := h.nantun_sport.GetAvailableTimeSlots(h.userSelectionDate, num)
+		if err != nil {
+			logger.Log.Error(err.Error())
+			return
+		}
+		if len(availableSlots) == 0 {
+			text := "目前無場地可預約，請重新選擇"
+			h.bot.SendMessage(callback.Message.Chat.ID, text)
+			return
+		}
+
+		// Create keyboard buttons for available slots
+		var keyboardRows [][]tgbotapi.InlineKeyboardButton
+		for _, slot := range availableSlots {
+			row := tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(slot.CourtName, "book_"+slot.Button),
+			)
+			keyboardRows = append(keyboardRows, row)
+		}
+
+		// Add back button
+		backRow := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+		)
+		keyboardRows = append(keyboardRows, backRow)
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
+		text := "以下是可預約的場地："
+		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
+	case "back_to_main":
+		text := "返回主選單"
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("南屯運動中心", "nantun_sport"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("朝馬運動中心", "chao_ma_sport"),
+			),
+		)
+		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
+	default:
+		// Handle all callbacks starting with "book_"
+		if len(callback.Data) >= 5 && callback.Data[:5] == "book_" {
+			selectedCourt := callback.Data[5:] // Extract court identifier
+			text := ""
+			targetSlot := []types.CleanTimeSlot{{Button: selectedCourt}}
+			if err := h.nantun_sport.BookCourt(targetSlot); err != nil {
+				logger.Log.Error(err.Error())
+				text = "預約失敗，請重新選擇"
+				h.bot.SendMessage(callback.Message.Chat.ID, text)
+				return
+			}
+			
+			h.bot.SendMessage(callback.Message.Chat.ID, text)
+			return
+		}
+		text := "未知的操作，請重新選擇"
+		h.bot.SendMessage(callback.Message.Chat.ID, text)
+	}
 }
 
+// #endregion
+
+// #region 預設指令
 // 處理 /start 命令
 func (h *MessageHandler) handleStart(message *tgbotapi.Message) {
 	text := "歡迎使用運動中心查詢機器人！\n請選擇您要查詢的場地。"
-	err := h.bot.SendMessage(message.Chat.ID, text)
-	if err != nil {
-		logger.Log.Error("發送歡迎訊息失敗：" + err.Error())
-	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("南屯運動中心", "nantun_sport"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("朝馬運動中心", "chao_ma_sport"),
+		),
+	)
+
+	// 發送帶有按鈕的消息
+	h.bot.SendeKeyboardMessage(message.Chat.ID, text, keyboard)
 }
 
-// 處理消息
+// 處理訊息
 func (h *MessageHandler) handleDefault(message *tgbotapi.Message) {
 	text := "收到您的訊息：" + message.Text
-	err := h.bot.SendMessage(message.Chat.ID, text)
-	if err != nil {
-		logger.Log.Error("發送回覆訊息失敗：" + err.Error())
-	}
+	h.bot.SendMessage(message.Chat.ID, text)
 }
+
+// #endregion
+
+// #region 南屯場地
+// 取得南屯所有可預約時間
+func (h *MessageHandler) getNantunSportAllAvailableTimeSlots(message *tgbotapi.Message) {
+	text := "收到您的訊息：" + message.Text
+	h.bot.SendMessage(message.Chat.ID, text)
+}
+
+// #endregion

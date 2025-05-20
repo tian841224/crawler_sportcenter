@@ -35,7 +35,7 @@ func NewNantunSportCenterService(browserService browser.BrowserService) NantunSp
 
 // 快速預定場地
 func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
-	page, err := s.initializePage()
+	page, err := s.browserService.GetPage(s.Nantun_Url)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
 			return err
 		}
 
-		if err := s.selectTimeSlot(page, cfg.DayPeriod); err != nil {
+		if err := s.selectTimeSlot(page, s.convertDayPeriodToTimeSlot(cfg.DayPeriod)); err != nil {
 			return err
 		}
 
@@ -84,7 +84,7 @@ func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
 
 // 爬蟲南屯運動中心
 func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
-	page, err := s.initializePage()
+	page, err := s.browserService.GetPage(s.Nantun_Url)
 	if err != nil {
 		return err
 	}
@@ -119,17 +119,7 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 			return err
 		}
 
-		// 判斷時段，1-12 為上午，13-18 為下午，19-24 為晚上
-		var dayPeriod int
-		if timeSlotCode <= types.TimeSlot_11_12 {
-			dayPeriod = 1
-		} else if timeSlotCode <= types.TimeSlot_17_18 {
-			dayPeriod = 2
-		} else {
-			dayPeriod = 3
-		}
-
-		if err := s.selectTimeSlot(page, dayPeriod); err != nil {
+		if err := s.selectTimeSlot(page, timeSlotCode); err != nil {
 			continue
 		}
 
@@ -160,23 +150,6 @@ func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
 
 	s.browserService.Close()
 	return nil
-}
-
-// 初始化頁面設定
-func (s *NantunSportCenterService) initializePage() (*rod.Page, error) {
-	s.browserService.InitBrowser()
-	page, err := s.browserService.GetPage()
-	if err != nil {
-		return nil, err
-	}
-
-	s.browserService.SetWebMode(true)
-
-	if err = page.Navigate(s.Nantun_Url); err != nil {
-		return nil, err
-	}
-
-	return page, nil
 }
 
 // 執行登入
@@ -346,7 +319,18 @@ func (s *NantunSportCenterService) navigateToPayment(page *rod.Page) error {
 }
 
 // SelectTimeSlot 選擇時段（1=上午，2=下午，3=晚上）
-func (s *NantunSportCenterService) selectTimeSlot(page *rod.Page, timeSlot int) error {
+func (s *NantunSportCenterService) selectTimeSlot(page *rod.Page, timeSlotCode types.TimeSlotCode) error {
+
+	// 判斷時段，1-12 為上午，13-18 為下午，19-24 為晚上
+	var timeSlot int
+	if timeSlotCode <= types.TimeSlot_11_12 {
+		timeSlot = 1
+	} else if timeSlotCode <= types.TimeSlot_17_18 {
+		timeSlot = 2
+	} else {
+		timeSlot = 3
+	}
+
 	// 檢查時段參數是否有效
 	if timeSlot < 1 || timeSlot > 3 {
 		return fmt.Errorf("無效的時段參數：%d，必須是 1-3 之間", timeSlot)
@@ -510,13 +494,13 @@ func (s *NantunSportCenterService) bookCourt(page *rod.Page, targetSlot []types.
 		// 構建 JavaScript 函數調用
 		script := fmt.Sprintf(`() => {
             try {
-                DoSubmit2(%s,'%s',%s,%s);
+                %s;
                 return true;
             } catch (e) {
                 console.error(e);
                 return false;
             }
-        }`, matches[1], matches[2], matches[3], matches[4])
+        }`, slot.Button)
 
 		// 執行 JavaScript
 		result, err := page.Eval(script)
@@ -788,4 +772,17 @@ func (s *NantunSportCenterService) fastBookCourt(page *rod.Page, buttonIndex int
 	}
 
 	return fmt.Errorf("預約流程未完成")
+}
+
+func (s *NantunSportCenterService) convertDayPeriodToTimeSlot(dayPeriod int) types.TimeSlotCode {
+	switch dayPeriod {
+	case 1: // 上午
+		return types.TimeSlot_8_9 // 或其他合適的上午時段
+	case 2: // 下午
+		return types.TimeSlot_14_15 // 或其他合適的下午時段
+	case 3: // 晚上
+		return types.TimeSlot_19_20 // 或其他合適的晚上時段
+	default:
+		return types.TimeSlot_8_9 // 默認返回上午時段
+	}
 }

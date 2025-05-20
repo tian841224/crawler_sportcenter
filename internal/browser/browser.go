@@ -10,10 +10,11 @@ import (
 )
 
 type BrowserInterface interface {
-	InitBrowser() error
-	GetPage() (*rod.Page, error)
+	initBrowser() error
+	initPage() (*rod.Page, error)
+	setWebMode(isMobileMode bool) error
+	GetPage(url string) (*rod.Page, error)
 	Close() error
-	SetWebMode(isMobileMode bool) error
 }
 
 var _ BrowserInterface = (*BrowserService)(nil)
@@ -28,7 +29,7 @@ func NewBrowserService() BrowserService {
 }
 
 // 初始化爬蟲
-func (s *BrowserService) InitBrowser() error {
+func (s *BrowserService) initBrowser() error {
 	// 設定瀏覽器啟動選項
 	l := launcher.New().
 		Headless(false).
@@ -49,7 +50,7 @@ func (s *BrowserService) InitBrowser() error {
 }
 
 // 取得頁面
-func (s *BrowserService) GetPage() (*rod.Page, error) {
+func (s *BrowserService) initPage() (*rod.Page, error) {
 	// 建立新頁面
 	s.page = stealth.MustPage(s.browser)
 
@@ -99,7 +100,7 @@ func (s *BrowserService) Close() error {
 }
 
 // 設定網頁模式
-func (s *BrowserService) SetWebMode(isMobileMode bool) error {
+func (s *BrowserService) setWebMode(isMobileMode bool) error {
 	if s.page == nil {
 		return nil
 	}
@@ -124,4 +125,21 @@ func (s *BrowserService) SetWebMode(isMobileMode bool) error {
 	}
 
 	return s.page.SetUserAgent(ua)
+}
+
+// 取得頁面
+func (s *BrowserService) GetPage(url string) (*rod.Page, error) {
+	s.initBrowser()
+	page, err := s.initPage()
+	if err != nil {
+		return nil, err
+	}
+
+	s.setWebMode(true)
+
+	if err = page.Navigate(url); err != nil {
+		return nil, err
+	}
+
+	return page, nil
 }

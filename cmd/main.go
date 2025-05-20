@@ -4,6 +4,8 @@ import (
 	"context"
 
 	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
+	"github.com/tian841224/crawler_sportcenter/internal/browser"
+	"github.com/tian841224/crawler_sportcenter/internal/crawler"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 )
@@ -21,9 +23,9 @@ func main() {
 	// #endregion
 
 	// #region 初始化瀏覽器
-	// browser := browser.NewBrowserService()
+	browser := browser.NewBrowserService()
 	// logger.Log.Info("初始化瀏覽器")
-	// nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
+	nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
 	// nantunSportCenterService.CrawlerNantun(cfg)
 	// #endregion
 
@@ -33,7 +35,9 @@ func main() {
 		logger.Log.Error("Failed to initialize Telegram Bot")
 		return
 	}
-	handler := tgbot.NewMessageHandler(botService)
+
+	nantunSportCenterBotService := crawler.NewNantunSportCenterBotService(browser, nantunSportCenterService, cfg)
+	handler := tgbot.NewMessageHandler(botService, &nantunSportCenterBotService)
 
 	// 設定訊息處理
 	botService.HandleMessage(handler.HandleUpdate)
