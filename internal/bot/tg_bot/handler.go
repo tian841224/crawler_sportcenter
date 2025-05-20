@@ -212,7 +212,7 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 	h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
 }
 
-func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) {
+func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) error {
 	selectedCourt := callback.Data[5:]
 	logger.Log.Info("用戶嘗試預約場地：" + selectedCourt)
 
@@ -221,11 +221,13 @@ func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) {
 		logger.Log.Error("預約失敗，原因：" + err.Error())
 		text := fmt.Sprintf("預約失敗：%v，請重新選擇", err)
 		h.bot.SendMessage(callback.Message.Chat.ID, text)
-		return
+		return err
 	}
 
-	text := fmt.Sprintf("成功預約場地：%s", selectedCourt)
-	h.bot.SendMessage(callback.Message.Chat.ID, text)
+	h.bot.SendMessage(callback.Message.Chat.ID, "成功預約場地")
+	h.bot.SendMessage(callback.Message.Chat.ID, h.nantun_sport.GetPaymentURL())
+
+	return nil
 }
 
 // #endregion

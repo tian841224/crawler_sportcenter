@@ -10,6 +10,7 @@ import (
 type NantunSportCenterBotInterface interface {
 	GetAvailableTimeSlots(weedday string, time_slot int) ([]types.CleanTimeSlot, error)
 	BookCourt(targetSlot []types.CleanTimeSlot) error
+	GetPaymentURL() string
 }
 
 var _ NantunSportCenterBotInterface = (*NantunSportCenterBotService)(nil)
@@ -31,6 +32,10 @@ func NewNantunSportCenterBotService(browserService browser.BrowserService, nantu
 		paymentURL:               "https://nd01.xuanen.com.tw/BPMemberOrder/BPMemberOrder",
 		cfg:                      cfg,
 	}
+}
+
+func (s *NantunSportCenterBotService) GetPaymentURL() string {
+	return s.paymentURL
 }
 
 func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time_slot int) ([]types.CleanTimeSlot, error) {
