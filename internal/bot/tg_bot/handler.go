@@ -99,7 +99,7 @@ func (h *MessageHandler) handleSportCenterSelection(callback *tgbotapi.CallbackQ
 	h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
 }
 
-// 創建日期選擇鍵盤
+// 建立日期選擇鍵盤
 func (h *MessageHandler) createDateSelectionKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -132,151 +132,100 @@ func (h *MessageHandler) handleDateSelection(callback *tgbotapi.CallbackQuery) {
 	h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
 }
 
+func (h *MessageHandler) createTimeSlotKeyboard() tgbotapi.InlineKeyboardMarkup {
+	timeSlots := []struct {
+		Text string
+		Data string
+	}{
+		{"6:00-7:00", "time_slot_1"},
+		{"7:00-8:00", "time_slot_2"},
+		{"8:00-9:00", "time_slot_3"},
+		{"9:00-10:00", "time_slot_4"},
+		{"10:00-11:00", "time_slot_5"},
+		{"11:00-12:00", "time_slot_6"},
+		{"12:00-13:00", "time_slot_7"},
+		{"13:00-14:00", "time_slot_8"},
+		{"14:00-15:00", "time_slot_9"},
+		{"15:00-16:00", "time_slot_10"},
+		{"16:00-17:00", "time_slot_11"},
+		{"17:00-18:00", "time_slot_12"},
+		{"18:00-19:00", "time_slot_13"},
+		{"19:00-20:00", "time_slot_14"},
+		{"20:00-21:00", "time_slot_15"},
+		{"21:00-22:00", "time_slot_16"},
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	// 每行放置3個按鈕
+	for i := 0; i < len(timeSlots); i += 3 {
+		var row []tgbotapi.InlineKeyboardButton
+		for j := 0; j < 3 && i+j < len(timeSlots); j++ {
+			slot := timeSlots[i+j]
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(slot.Text, slot.Data))
+		}
+		rows = append(rows, row)
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+	))
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
 // 處理時段選擇
 func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuery) {
-	// 根據 callback.Data 來處理不同的按鈕操作
-	switch callback.Data {
-	case "nantun_sport":
-		text := "選擇訂閱時間"
+	h.userSelectionTimeSlot = callback.Data[10:]
+	num, _ := strconv.Atoi(h.userSelectionTimeSlot)
 
-		keyboard := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("日", "date_0"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("一", "date_1"),
-				tgbotapi.NewInlineKeyboardButtonData("二", "date_2"),
-				tgbotapi.NewInlineKeyboardButtonData("三", "date_3"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("四", "date_4"),
-				tgbotapi.NewInlineKeyboardButtonData("五", "date_5"),
-				tgbotapi.NewInlineKeyboardButtonData("六", "date_6"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
-			),
-		)
-		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
-	// 選擇訂閱時段
-	case "date_0", "date_1", "date_2", "date_3", "date_4", "date_5", "date_6":
-		// Convert numeric day to Chinese character
-		dayMap := map[string]string{
-			"0": "日",
-			"1": "一",
-			"2": "二",
-			"3": "三",
-			"4": "四",
-			"5": "五",
-			"6": "六",
-		}
-		h.userSelectionDate = dayMap[callback.Data[5:]]
-		// 處理按鈕回調的邏輯
-		logger.Log.Info("收到按鈕回調：" + h.userSelectionDate)
-		text := "選擇訂閱時間"
+	// Log user's time slot selection
+	logger.Log.Info("User selected time slot: " + h.userSelectionTimeSlot)
 
-		keyboard := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("6:00-7:00", "time_slot_1"),
-				tgbotapi.NewInlineKeyboardButtonData("7:00-8:00", "time_slot_2"),
-				tgbotapi.NewInlineKeyboardButtonData("8:00-9:00", "time_slot_3"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("9:00-10:00", "time_slot_4"),
-				tgbotapi.NewInlineKeyboardButtonData("10:00-11:00", "time_slot_5"),
-				tgbotapi.NewInlineKeyboardButtonData("11:00-12:00", "time_slot_6"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("12:00-13:00", "time_slot_7"),
-				tgbotapi.NewInlineKeyboardButtonData("13:00-14:00", "time_slot_8"),
-				tgbotapi.NewInlineKeyboardButtonData("14:00-15:00", "time_slot_9"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("15:00-16:00", "time_slot_10"),
-				tgbotapi.NewInlineKeyboardButtonData("16:00-17:00", "time_slot_11"),
-				tgbotapi.NewInlineKeyboardButtonData("17:00-18:00", "time_slot_12"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("18:00-19:00", "time_slot_13"),
-				tgbotapi.NewInlineKeyboardButtonData("19:00-20:00", "time_slot_14"),
-				tgbotapi.NewInlineKeyboardButtonData("20:00-21:00", "time_slot_15"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("21:00-22:00", "time_slot_16"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
-			),
-		)
-		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
-	case "time_slot_1", "time_slot_2", "time_slot_3", "time_slot_4", "time_slot_5", "time_slot_6", "time_slot_7", "time_slot_8", "time_slot_9", "time_slot_10", "time_slot_11", "time_slot_12", "time_slot_13", "time_slot_14", "time_slot_15", "time_slot_16":
-		// Extract time slot number from callback data
-		h.userSelectionTimeSlot = callback.Data[10:]
-		num, _ := strconv.Atoi(h.userSelectionTimeSlot)
-
-		// Log user's time slot selection
-		logger.Log.Info("User selected time slot: " + h.userSelectionTimeSlot)
-
-		// Get available slots for selected date and time
-		availableSlots, err := h.nantun_sport.GetAvailableTimeSlots(h.userSelectionDate, num)
-		if err != nil {
-			logger.Log.Error(err.Error())
-			return
-		}
-		if len(availableSlots) == 0 {
-			text := "目前無場地可預約，請重新選擇"
-			h.bot.SendMessage(callback.Message.Chat.ID, text)
-			return
-		}
-
-		// Create keyboard buttons for available slots
-		var keyboardRows [][]tgbotapi.InlineKeyboardButton
-		for _, slot := range availableSlots {
-			row := tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData(slot.CourtName, "book_"+slot.Button),
-			)
-			keyboardRows = append(keyboardRows, row)
-		}
-
-		// Add back button
-		backRow := tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
-		)
-		keyboardRows = append(keyboardRows, backRow)
-
-		keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
-		text := "以下是可預約的場地："
-		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
-	case "back_to_main":
-		text := "返回主選單"
-		keyboard := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("南屯運動中心", "nantun_sport"),
-			),
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("朝馬運動中心", "chao_ma_sport"),
-			),
-		)
-		h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
-	default:
-		// Handle all callbacks starting with "book_"
-		if len(callback.Data) >= 5 && callback.Data[:5] == "book_" {
-			selectedCourt := callback.Data[5:] // Extract court identifier
-			text := ""
-			targetSlot := []types.CleanTimeSlot{{Button: selectedCourt}}
-			if err := h.nantun_sport.BookCourt(targetSlot); err != nil {
-				logger.Log.Error(err.Error())
-				text = "預約失敗，請重新選擇"
-				h.bot.SendMessage(callback.Message.Chat.ID, text)
-				return
-			}
-
-			h.bot.SendMessage(callback.Message.Chat.ID, text)
-			return
-		}
-		text := "未知的操作，請重新選擇"
-		h.bot.SendMessage(callback.Message.Chat.ID, text)
+	// Get available slots for selected date and time
+	availableSlots, err := h.nantun_sport.GetAvailableTimeSlots(h.userSelectionDate, num)
+	if err != nil {
+		logger.Log.Error(err.Error())
+		return
 	}
+	if len(availableSlots) == 0 {
+		text := "目前無場地可預約，請重新選擇"
+		h.bot.SendMessage(callback.Message.Chat.ID, text)
+		return
+	}
+
+	// Create keyboard buttons for available slots
+	var keyboardRows [][]tgbotapi.InlineKeyboardButton
+	for _, slot := range availableSlots {
+		row := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(slot.CourtName, "book_"+slot.Button),
+		)
+		keyboardRows = append(keyboardRows, row)
+	}
+
+	backRow := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+	)
+	keyboardRows = append(keyboardRows, backRow)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
+	text := "以下是可預約的場地："
+	h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, text, keyboard)
+}
+
+func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) {
+	selectedCourt := callback.Data[5:]
+	logger.Log.Info("用戶嘗試預約場地：" + selectedCourt)
+
+	targetSlot := []types.CleanTimeSlot{{Button: selectedCourt}}
+	if err := h.nantun_sport.BookCourt(targetSlot); err != nil {
+		logger.Log.Error("預約失敗，原因：" + err.Error())
+		text := fmt.Sprintf("預約失敗：%v，請重新選擇", err)
+		h.bot.SendMessage(callback.Message.Chat.ID, text)
+		return
+	}
+
+	text := fmt.Sprintf("成功預約場地：%s", selectedCourt)
+	h.bot.SendMessage(callback.Message.Chat.ID, text)
 }
 
 // #endregion
@@ -315,61 +264,3 @@ func (h *MessageHandler) getNantunSportAllAvailableTimeSlots(message *tgbotapi.M
 }
 
 // #endregion
-
-func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) {
-	selectedCourt := callback.Data[5:]
-	logger.Log.Info("用戶嘗試預約場地：" + selectedCourt)
-
-	targetSlot := []types.CleanTimeSlot{{Button: selectedCourt}}
-	if err := h.nantun_sport.BookCourt(targetSlot); err != nil {
-		logger.Log.Error("預約失敗，原因：" + err.Error())
-		text := fmt.Sprintf("預約失敗：%v，請重新選擇", err)
-		h.bot.SendMessage(callback.Message.Chat.ID, text)
-		return
-	}
-
-	text := fmt.Sprintf("成功預約場地：%s", selectedCourt)
-	h.bot.SendMessage(callback.Message.Chat.ID, text)
-}
-
-func (h *MessageHandler) createTimeSlotKeyboard() tgbotapi.InlineKeyboardMarkup {
-	timeSlots := []struct {
-		Text string
-		Data string
-	}{
-		{"6:00-7:00", "time_slot_1"},
-		{"7:00-8:00", "time_slot_2"},
-		{"8:00-9:00", "time_slot_3"},
-		{"9:00-10:00", "time_slot_4"},
-		{"10:00-11:00", "time_slot_5"},
-		{"11:00-12:00", "time_slot_6"},
-		{"12:00-13:00", "time_slot_7"},
-		{"13:00-14:00", "time_slot_8"},
-		{"14:00-15:00", "time_slot_9"},
-		{"15:00-16:00", "time_slot_10"},
-		{"16:00-17:00", "time_slot_11"},
-		{"17:00-18:00", "time_slot_12"},
-		{"18:00-19:00", "time_slot_13"},
-		{"19:00-20:00", "time_slot_14"},
-		{"20:00-21:00", "time_slot_15"},
-		{"21:00-22:00", "time_slot_16"},
-	}
-
-	var rows [][]tgbotapi.InlineKeyboardButton
-	// 每行放置3個按鈕
-	for i := 0; i < len(timeSlots); i += 3 {
-		var row []tgbotapi.InlineKeyboardButton
-		for j := 0; j < 3 && i+j < len(timeSlots); j++ {
-			slot := timeSlots[i+j]
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(slot.Text, slot.Data))
-		}
-		rows = append(rows, row)
-	}
-
-	// 添加返回按鈕
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
-	))
-
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
-}
