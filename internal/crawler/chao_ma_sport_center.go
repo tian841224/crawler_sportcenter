@@ -21,7 +21,7 @@ func NewChaoMaSportCenterService(browserService browser.BrowserService) *ChaoMaS
 // 爬蟲朝馬運動中心
 func (s *ChaoMaSportCenterService) CrawlerChaoMa() error {
 	// 建立新頁面
-	page, err := s.browserService.GetPage(s.Chao_Ma_Url)
+	page, err := s.browserService.GetPage(s.Chao_Ma_Url, "")
 	if err != nil {
 		logger.Log.Error("無法創建新頁面: " + err.Error())
 		return err

@@ -8,7 +8,7 @@ import (
 )
 
 type NantunSportCenterBotInterface interface {
-	GetAvailableTimeSlots(weedday string, time_slot int) ([]types.CleanTimeSlot, error)
+	GetAvailableTimeSlots(weedday string, time_slot int, tag string) ([]types.CleanTimeSlot, error)
 	BookCourt(targetSlot []types.CleanTimeSlot) error
 	GetPaymentURL() string
 }
@@ -21,7 +21,8 @@ type NantunSportCenterBotService struct {
 	Nantun_Url               string // 南屯運動中心網址
 	paymentURL               string // 付款網址
 	cfg                      config.Config
-	page                     *rod.Page ``
+	page                     *rod.Page
+	userList              map[int64]struct{}
 }
 
 func NewNantunSportCenterBotService(browserService browser.BrowserService, nantunSportCenterService NantunSportCenterService, cfg config.Config) NantunSportCenterBotService {
@@ -38,12 +39,12 @@ func (s *NantunSportCenterBotService) GetPaymentURL() string {
 	return s.paymentURL
 }
 
-func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time_slot int) ([]types.CleanTimeSlot, error) {
+func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time_slot int, tag string) ([]types.CleanTimeSlot, error) {
 
 	timeSlotCode := types.TimeSlotCode(time_slot) // 將 int 轉換為 TimeSlotCode
 
 	var err error
-	s.page, err = s.browserService.GetPage(s.Nantun_Url)
+	s.page, err = s.browserService.GetPage(s.Nantun_Url, tag)
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func NewNantunSportCenterService(browserService browser.BrowserService) NantunSp
 
 // 快速預定場地
 func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
-	page, err := s.browserService.GetPage(s.Nantun_Url)
+	page, err := s.browserService.GetPage(s.Nantun_Url, "")
 	if err != nil {
 		return err
 	}
@@ -83,8 +83,9 @@ func (s *NantunSportCenterService) QuickCrawlerNantun(cfg config.Config) error {
 }
 
 // 爬蟲南屯運動中心
-func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config) error {
-	page, err := s.browserService.GetPage(s.Nantun_Url)
+func (s *NantunSportCenterService) CrawlerNantun(cfg config.Config, tag string) error {
+
+	page, err := s.browserService.GetPage(s.Nantun_Url, tag)
 	if err != nil {
 		return err
 	}
@@ -461,7 +462,7 @@ func (s *NantunSportCenterService) getAllAvailableTimeSlots(page *rod.Page) ([]t
 			Button:    slot.Button,
 		})
 	}
-	logger.Log.Info(fmt.Sprintf("找到 %d 個可預約時段:", len(cleanSlots)))
+	logger.Log.Info(fmt.Sprintf("找到 %d 個可預約時段", len(cleanSlots)))
 	return cleanSlots, nil
 }
 
@@ -476,7 +477,7 @@ func (s *NantunSportCenterService) findAvailableCourtsByTimeSlot(slots []types.C
 		}
 	}
 
-	logger.Log.Info(fmt.Sprintf("找到 %d 個 %v 點可預約時段:", len(availableCourts), targetTime))
+	logger.Log.Info(fmt.Sprintf("找到 %d 個 %v 點可預約時段", len(availableCourts), targetTime))
 	return availableCourts
 }
 

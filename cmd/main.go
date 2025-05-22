@@ -24,7 +24,8 @@ func main() {
 
 	// #region 初始化瀏覽器
 	browser := browser.NewBrowserService()
-	// logger.Log.Info("初始化瀏覽器")
+	defer browser.Close()
+	logger.Log.Info("初始化瀏覽器")
 	nantunSportCenterService := crawler.NewNantunSportCenterService(browser)
 	// nantunSportCenterService.CrawlerNantun(cfg)
 	// #endregion

@@ -53,7 +53,7 @@ func NewTGBotService(cfg config.Config) *TGBotService {
 	}
 
 	// debug 模式
-	bot.Debug = true
+	// bot.Debug = true
 	return &TGBotService{
 		cfg: cfg,
 		bot: bot,

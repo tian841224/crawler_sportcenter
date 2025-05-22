@@ -16,12 +16,14 @@ type MessageHandler struct {
 	nantun_sport          crawler.NantunSportCenterBotInterface
 	userSelectionDate     string
 	userSelectionTimeSlot string
+	userList              map[int64]struct{}
 }
 
 func NewMessageHandler(bot TGBotInterface, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
 	return &MessageHandler{
 		bot:          bot,
 		nantun_sport: nantun_sport,
+		userList:     make(map[int64]struct{}),
 	}
 }
 
@@ -31,6 +33,12 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 	case update.Message != nil:
 		h.handleMessage(update.Message)
 	case update.CallbackQuery != nil:
+		// 取TG ID
+		id := update.CallbackQuery.From.ID
+		// 儲存使用者ID
+		if _, exists := h.userList[id]; !exists {
+			h.userList[id] = struct{}{}
+		}
 		h.handleCallback(update.CallbackQuery)
 	}
 }
@@ -38,7 +46,6 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 // #region 處理所有格式訊息
 // 處理文字訊息
 func (h *MessageHandler) handleMessage(message *tgbotapi.Message) {
-	// 根據消息內容處理
 	switch message.Text {
 	case "/start":
 		h.handleStart(message)
@@ -61,14 +68,19 @@ func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	switch {
 	case callback.Data == callbackNantunSport:
 		h.handleSportCenterSelection(callback)
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case callback.Data == callbackBackToMain:
 		h.handleBackToMain(callback)
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case strings.HasPrefix(callback.Data, prefixDate):
 		h.handleDateSelection(callback)
-	case strings.HasPrefix(callback.Data, "time_slot_"):
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+	case strings.HasPrefix(callback.Data, prefixTimeSlot):
 		h.handleTimeSlotSelection(callback)
-	case strings.HasPrefix(callback.Data, "book_"):
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+	case strings.HasPrefix(callback.Data, prefixBook):
 		h.handleBooking(callback)
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	default:
 		h.handleUnknownCallback(callback)
 	}
@@ -80,7 +92,7 @@ func (h *MessageHandler) handleUnknownCallback(callback *tgbotapi.CallbackQuery)
 }
 
 func (h *MessageHandler) handleBackToMain(callback *tgbotapi.CallbackQuery) {
-	text := "返回主選單"
+	text := "請選擇您要查詢的場地"
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("南屯運動中心", "nantun_sport"),
@@ -115,6 +127,9 @@ func (h *MessageHandler) createDateSelectionKeyboard() tgbotapi.InlineKeyboardMa
 			tgbotapi.NewInlineKeyboardButtonData("五", "date_5"),
 			tgbotapi.NewInlineKeyboardButtonData("六", "date_6"),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+		),
 	)
 }
 
@@ -137,7 +152,7 @@ func (h *MessageHandler) createTimeSlotKeyboard() tgbotapi.InlineKeyboardMarkup 
 		Text string
 		Data string
 	}{
-		{"6:00-7:00", "time_slot_1"},
+		{Text: "6:00-7:00", Data: "time_slot_1"},
 		{"7:00-8:00", "time_slot_2"},
 		{"8:00-9:00", "time_slot_3"},
 		{"9:00-10:00", "time_slot_4"},
@@ -178,11 +193,9 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 	h.userSelectionTimeSlot = callback.Data[10:]
 	num, _ := strconv.Atoi(h.userSelectionTimeSlot)
 
-	// Log user's time slot selection
 	logger.Log.Info("User selected time slot: " + h.userSelectionTimeSlot)
 
-	// Get available slots for selected date and time
-	availableSlots, err := h.nantun_sport.GetAvailableTimeSlots(h.userSelectionDate, num)
+	availableSlots, err := h.nantun_sport.GetAvailableTimeSlots(h.userSelectionDate, num, fmt.Sprint(callback.Message.Chat.ID))
 	if err != nil {
 		logger.Log.Error(err.Error())
 		return
@@ -193,7 +206,6 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 		return
 	}
 
-	// Create keyboard buttons for available slots
 	var keyboardRows [][]tgbotapi.InlineKeyboardButton
 	for _, slot := range availableSlots {
 		row := tgbotapi.NewInlineKeyboardRow(
@@ -224,7 +236,7 @@ func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) error {
 		return err
 	}
 
-	h.bot.SendMessage(callback.Message.Chat.ID, "成功預約場地")
+	h.bot.SendMessage(callback.Message.Chat.ID, "成功預約場地，請前往以下網址完成付款：")
 	h.bot.SendMessage(callback.Message.Chat.ID, h.nantun_sport.GetPaymentURL())
 
 	return nil
