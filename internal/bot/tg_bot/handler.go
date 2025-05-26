@@ -67,20 +67,20 @@ const (
 func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	switch {
 	case callback.Data == callbackNantunSport:
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleSportCenterSelection(callback)
-		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case callback.Data == callbackBackToMain:
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleBackToMain(callback)
-		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case strings.HasPrefix(callback.Data, prefixDate):
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleDateSelection(callback)
-		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case strings.HasPrefix(callback.Data, prefixTimeSlot):
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleTimeSlotSelection(callback)
-		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 	case strings.HasPrefix(callback.Data, prefixBook):
-		h.handleBooking(callback)
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+		h.handleBooking(callback)
 	default:
 		h.handleUnknownCallback(callback)
 	}

@@ -22,7 +22,7 @@ type NantunSportCenterBotService struct {
 	paymentURL               string // 付款網址
 	cfg                      config.Config
 	page                     *rod.Page
-	userList              map[int64]struct{}
+	tagList                  map[string]struct{}
 }
 
 func NewNantunSportCenterBotService(browserService browser.BrowserService, nantunSportCenterService NantunSportCenterService, cfg config.Config) NantunSportCenterBotService {
@@ -32,6 +32,7 @@ func NewNantunSportCenterBotService(browserService browser.BrowserService, nantu
 		Nantun_Url:               "https://nd01.xuanen.com.tw/BPMember/BPMemberLogin",
 		paymentURL:               "https://nd01.xuanen.com.tw/BPMemberOrder/BPMemberOrder",
 		cfg:                      cfg,
+		tagList:                  make(map[string]struct{}),
 	}
 }
 
@@ -44,33 +45,38 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 	timeSlotCode := types.TimeSlotCode(time_slot) // 將 int 轉換為 TimeSlotCode
 
 	var err error
+	
 	s.page, err = s.browserService.GetPage(s.Nantun_Url, tag)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = s.nantunSportCenterService.login(s.page, s.cfg); err != nil {
-		return nil, err
-	}
-
-	if err = s.nantunSportCenterService.clickAgreeButton(s.page); err != nil {
-		return nil, err
-	}
-
-	if err = s.nantunSportCenterService.selectLocationBooking(s.page); err != nil {
-		return nil, err
-	}
-
-	if err = s.nantunSportCenterService.selectBadminton(s.page); err != nil {
-		return nil, err
-	}
-
-	if err = s.nantunSportCenterService.setCheckboxAndProceed(s.page); err != nil {
-		return nil, err
-	}
-
-	if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
-		return nil, err
+	// 如果頁面已存在的話，跳過以下步驟
+	if !s.hasTag(tag) {
+		s.tagList[tag] = struct{}{}
+		if err = s.nantunSportCenterService.login(s.page, s.cfg); err != nil {
+			return nil, err
+		}
+	
+		if err = s.nantunSportCenterService.clickAgreeButton(s.page); err != nil {
+			return nil, err
+		}
+	
+		if err = s.nantunSportCenterService.selectLocationBooking(s.page); err != nil {
+			return nil, err
+		}
+	
+		if err = s.nantunSportCenterService.selectBadminton(s.page); err != nil {
+			return nil, err
+		}
+	
+		if err = s.nantunSportCenterService.setCheckboxAndProceed(s.page); err != nil {
+			return nil, err
+		}
+	
+		if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = s.nantunSportCenterService.selectDate(s.page, weekday); err != nil {
@@ -89,6 +95,13 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 	targetSlot := s.nantunSportCenterService.findAvailableCourtsByTimeSlot(cleanSlots, timeSlotCode)
 
 	return targetSlot, nil
+}
+
+// 新增：檢查標籤是否存在
+func (s *NantunSportCenterBotService) hasTag(tag string) bool {
+    // 直接檢查 map 中是否存在該 key
+    _, exists := s.tagList[tag]
+    return exists
 }
 
 func (s *NantunSportCenterBotService) BookCourt(targetSlot []types.CleanTimeSlot) error {
