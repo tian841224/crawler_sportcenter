@@ -29,8 +29,9 @@ type BrowserService struct {
 }
 
 type PageInfo struct {
-	Page *rod.Page
-	Tag  string
+	Page  *rod.Page
+	Tag   string
+	pages []PageInfo
 }
 
 func NewBrowserService() BrowserService {
@@ -69,6 +70,7 @@ func (s *BrowserService) SwitchToPageByTag(tag string) (*rod.Page, error) {
 	for _, p := range s.pages {
 		if p.Tag == tag {
 			s.page = p.Page
+			s.page.MustActivate()
 			return p.Page, nil
 		}
 	}
@@ -149,6 +151,10 @@ func (s *BrowserService) initPage(tag string) (*rod.Page, error) {
 		return nil, err
 	}
 
+	s.pages = append(s.pages, PageInfo{
+		Page: s.page,
+		Tag:  tag,
+	})
 	s.pages = append(s.pages, PageInfo{
 		Page: s.page,
 		Tag:  tag,
