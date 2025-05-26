@@ -45,7 +45,7 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 	timeSlotCode := types.TimeSlotCode(time_slot) // 將 int 轉換為 TimeSlotCode
 
 	var err error
-	
+
 	s.page, err = s.browserService.GetPage(s.Nantun_Url, tag)
 	if err != nil {
 		return nil, err
@@ -57,26 +57,40 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 		if err = s.nantunSportCenterService.login(s.page, s.cfg); err != nil {
 			return nil, err
 		}
-	
-		if err = s.nantunSportCenterService.clickAgreeButton(s.page); err != nil {
-			return nil, err
+	}
+
+	// 點擊首頁按鈕返回
+	script := `() => {
+		try {
+			window.location = '/BPHome/BPHome';
+			return true;
+		} catch (e) {
+			console.error(e);
+			return false;
 		}
-	
-		if err = s.nantunSportCenterService.selectLocationBooking(s.page); err != nil {
-			return nil, err
-		}
-	
-		if err = s.nantunSportCenterService.selectBadminton(s.page); err != nil {
-			return nil, err
-		}
-	
-		if err = s.nantunSportCenterService.setCheckboxAndProceed(s.page); err != nil {
-			return nil, err
-		}
-	
-		if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
-			return nil, err
-		}
+	}`
+
+	// 執行返回首頁腳本
+	s.page.Eval(script)
+
+	if err = s.nantunSportCenterService.clickAgreeButton(s.page); err != nil {
+		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.selectLocationBooking(s.page); err != nil {
+		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.selectBadminton(s.page); err != nil {
+		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.setCheckboxAndProceed(s.page); err != nil {
+		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
+		return nil, err
 	}
 
 	if err = s.nantunSportCenterService.selectDate(s.page, weekday); err != nil {
@@ -99,9 +113,9 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 
 // 新增：檢查標籤是否存在
 func (s *NantunSportCenterBotService) hasTag(tag string) bool {
-    // 直接檢查 map 中是否存在該 key
-    _, exists := s.tagList[tag]
-    return exists
+	// 直接檢查 map 中是否存在該 key
+	_, exists := s.tagList[tag]
+	return exists
 }
 
 func (s *NantunSportCenterBotService) BookCourt(targetSlot []types.CleanTimeSlot) error {
