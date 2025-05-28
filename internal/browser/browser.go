@@ -1,6 +1,8 @@
 package browser
 
 import (
+	"fmt"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
@@ -10,10 +12,12 @@ import (
 )
 
 type BrowserInterface interface {
-	InitBrowser() error
-	GetPage() (*rod.Page, error)
+	initBrowser() error
+	initPage(tag string) (*rod.Page, error)
+	setWebMode(isMobileMode bool) error
+	GetPage(url string, tag string) (*rod.Page, error)
+	SwitchToPageByTag(tag string) (*rod.Page, error)
 	Close() error
-	SetWebMode(isMobileMode bool) error
 }
 
 var _ BrowserInterface = (*BrowserService)(nil)
@@ -21,14 +25,74 @@ var _ BrowserInterface = (*BrowserService)(nil)
 type BrowserService struct {
 	browser *rod.Browser
 	page    *rod.Page
+	pages   []PageInfo
+}
+
+type PageInfo struct {
+	Page  *rod.Page
+	Tag   string
+	pages []PageInfo
 }
 
 func NewBrowserService() BrowserService {
-	return BrowserService{}
+	return BrowserService{
+		pages: make([]PageInfo, 0),
+	}
+}
+
+// 取得頁面
+func (s *BrowserService) GetPage(url string, tag string) (*rod.Page, error) {
+	if s.browser == nil {
+		if err := s.initBrowser(); err != nil {
+			return nil, err
+		}
+	}
+
+	if s.hasTag(tag) {
+		return s.SwitchToPageByTag(tag)
+	}
+
+	page, err := s.initPage(tag)
+	if err != nil {
+		return nil, err
+	}
+	s.setWebMode(true)
+
+	if err = page.Navigate(url); err != nil {
+		return nil, err
+	}
+
+	return page, nil
+}
+
+// 根據標籤切換頁面
+func (s *BrowserService) SwitchToPageByTag(tag string) (*rod.Page, error) {
+	for _, p := range s.pages {
+		if p.Tag == tag {
+			s.page = p.Page
+			s.page.MustActivate()
+			return p.Page, nil
+		}
+	}
+	return nil, fmt.Errorf("找不到標籤為 %s 的頁面", tag)
+}
+
+// 關閉瀏覽器
+func (s *BrowserService) Close() error {
+	for _, pageInfo := range s.pages {
+		if pageInfo.Page != nil {
+			pageInfo.Page.Close()
+		}
+	}
+
+	if s.browser != nil {
+		return s.browser.Close()
+	}
+	return nil
 }
 
 // 初始化爬蟲
-func (s *BrowserService) InitBrowser() error {
+func (s *BrowserService) initBrowser() error {
 	// 設定瀏覽器啟動選項
 	l := launcher.New().
 		Headless(false).
@@ -49,7 +113,7 @@ func (s *BrowserService) InitBrowser() error {
 }
 
 // 取得頁面
-func (s *BrowserService) GetPage() (*rod.Page, error) {
+func (s *BrowserService) initPage(tag string) (*rod.Page, error) {
 	// 建立新頁面
 	s.page = stealth.MustPage(s.browser)
 
@@ -87,19 +151,19 @@ func (s *BrowserService) GetPage() (*rod.Page, error) {
 		return nil, err
 	}
 
+	s.pages = append(s.pages, PageInfo{
+		Page: s.page,
+		Tag:  tag,
+	})
+	s.pages = append(s.pages, PageInfo{
+		Page: s.page,
+		Tag:  tag,
+	})
 	return s.page, nil
 }
 
-// 關閉瀏覽器
-func (s *BrowserService) Close() error {
-	if s.browser != nil {
-		return s.browser.Close()
-	}
-	return nil
-}
-
 // 設定網頁模式
-func (s *BrowserService) SetWebMode(isMobileMode bool) error {
+func (s *BrowserService) setWebMode(isMobileMode bool) error {
 	if s.page == nil {
 		return nil
 	}
@@ -124,4 +188,14 @@ func (s *BrowserService) SetWebMode(isMobileMode bool) error {
 	}
 
 	return s.page.SetUserAgent(ua)
+}
+
+// 新增：檢查標籤是否存在
+func (s *BrowserService) hasTag(tag string) bool {
+	for _, pageInfo := range s.pages {
+		if pageInfo.Tag == tag {
+			return true
+		}
+	}
+	return false
 }
