@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/tian841224/crawler_sportcenter/internal/bot/scheduler"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
 	"github.com/tian841224/crawler_sportcenter/internal/types"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
@@ -17,13 +18,15 @@ type MessageHandler struct {
 	userSelectionDate     string
 	userSelectionTimeSlot string
 	userList              map[int64]struct{}
+	scheduler             *scheduler.SchedulerService // 新增
 }
 
-func NewMessageHandler(bot TGBotInterface, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
+func NewMessageHandler(bot TGBotInterface, nantun_sport crawler.NantunSportCenterBotInterface, scheduler *scheduler.SchedulerService) *MessageHandler {
 	return &MessageHandler{
 		bot:          bot,
 		nantun_sport: nantun_sport,
 		userList:     make(map[int64]struct{}),
+		scheduler:    scheduler,
 	}
 }
 
@@ -81,6 +84,15 @@ func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	case strings.HasPrefix(callback.Data, prefixBook):
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleBooking(callback)
+	case callback.Data == "subscribe":
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+		h.handleSubscribe(callback)
+	case callback.Data == "unsubscribe":
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+		h.handleUnsubscribe(callback)
+	case callback.Data == "list_subscriptions":
+		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
+		h.handleListSubscriptions(callback)
 	default:
 		h.handleUnknownCallback(callback)
 	}
@@ -278,3 +290,65 @@ func (h *MessageHandler) getNantunSportAllAvailableTimeSlots(message *tgbotapi.M
 }
 
 // #endregion
+
+// 添加訂閱處理函數
+func (h *MessageHandler) handleSubscribe(callback *tgbotapi.CallbackQuery) {
+	// 使用當前選擇的日期和時段進行訂閱
+	if h.userSelectionDate == "" || h.userSelectionTimeSlot == "" {
+		h.bot.SendMessage(callback.Message.Chat.ID, "請先選擇日期和時段")
+		return
+	}
+
+	timeSlot, _ := strconv.Atoi(h.userSelectionTimeSlot)
+	h.scheduler.AddSubscription(callback.Message.Chat.ID, h.userSelectionDate, timeSlot)
+
+	timeSlotText := types.TimeSlotMap[types.TimeSlotCode(timeSlot)]
+	message := fmt.Sprintf("已訂閱星期%s的%s，當有可用場地時將通知您", h.userSelectionDate, timeSlotText)
+	h.bot.SendMessage(callback.Message.Chat.ID, message)
+}
+
+// 添加取消訂閱處理函數
+func (h *MessageHandler) handleUnsubscribe(callback *tgbotapi.CallbackQuery) {
+	// 顯示用戶的所有訂閱，讓用戶選擇要取消的訂閱
+	subs := h.scheduler.GetUserSubscriptions(callback.Message.Chat.ID)
+	if len(subs) == 0 {
+		h.bot.SendMessage(callback.Message.Chat.ID, "您目前沒有任何訂閱")
+		return
+	}
+
+	var keyboardRows [][]tgbotapi.InlineKeyboardButton
+	for i, sub := range subs {
+		timeSlotText := types.TimeSlotMap[types.TimeSlotCode(sub.TimeSlot)]
+		text := fmt.Sprintf("星期%s %s", sub.Weekday, timeSlotText)
+		data := fmt.Sprintf("unsub_%d_%s_%d", i, sub.Weekday, sub.TimeSlot)
+		row := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(text, data),
+		)
+		keyboardRows = append(keyboardRows, row)
+	}
+
+	backRow := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("返回主選單", "back_to_main"),
+	)
+	keyboardRows = append(keyboardRows, backRow)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
+	h.bot.SendeKeyboardMessage(callback.Message.Chat.ID, "選擇要取消的訂閱：", keyboard)
+}
+
+// 添加列出訂閱處理函數
+func (h *MessageHandler) handleListSubscriptions(callback *tgbotapi.CallbackQuery) {
+	subs := h.scheduler.GetUserSubscriptions(callback.Message.Chat.ID)
+	if len(subs) == 0 {
+		h.bot.SendMessage(callback.Message.Chat.ID, "您目前沒有任何訂閱")
+		return
+	}
+
+	message := "您目前的訂閱：\n"
+	for i, sub := range subs {
+		timeSlotText := types.TimeSlotMap[types.TimeSlotCode(sub.TimeSlot)]
+		message += fmt.Sprintf("%d. 星期%s %s\n", i+1, sub.Weekday, timeSlotText)
+	}
+
+	h.bot.SendMessage(callback.Message.Chat.ID, message)
+}
