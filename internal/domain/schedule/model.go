@@ -23,5 +23,3 @@ type Schedule struct {
 func (Schedule) TableName() string {
 	return "schedule"
 }
-
-// ... existing code ...
