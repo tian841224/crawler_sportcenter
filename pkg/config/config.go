@@ -11,6 +11,9 @@ import (
 )
 
 type Config struct {
+	DBName                string
+	DBUser                string
+	DBPassword            string
 	ChooseWeekday         string
 	TimeSlotCodes         []types.TimeSlotCode // 改為切片以支援多個時段
 	DayPeriod             int
@@ -46,6 +49,9 @@ func LoadConfig() Config {
 
 	// 從環境變數中獲取值
 	cfg := Config{
+		DBName:                os.Getenv("DB_NAME"),
+		DBUser:                os.Getenv("DB_USER"),
+		DBPassword:            os.Getenv("DB_PASSWORD"),
 		ChooseWeekday:         os.Getenv("CHOOSE_WEEKDAY"),
 		TimeSlotCodes:         timeSlotCodes,
 		ID:                    os.Getenv("ID"),

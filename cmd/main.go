@@ -6,8 +6,10 @@ import (
 	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
 	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
+	"github.com/tian841224/crawler_sportcenter/internal/db"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -20,6 +22,17 @@ func main() {
 	// #region 讀取設定檔
 	cfg := config.LoadConfig()
 	logger.Log.Info("載入設定檔")
+	// #endregion
+
+	//  #region 初始化資料庫
+	dbInstance := db.NewDB(cfg)
+	// Debug用
+	// dbInstance.DropDatabase(cfg.DBName)
+	_, err := dbInstance.InitDatabase()
+	if err != nil {
+		logger.Log.Fatal("無法連接到資料庫", zap.Error(err))
+	}
+	logger.Log.Info("初始化資料庫")
 	// #endregion
 
 	// #region 初始化瀏覽器
@@ -36,6 +49,7 @@ func main() {
 		logger.Log.Error("Failed to initialize Telegram Bot")
 		return
 	}
+	logger.Log.Info("初始化Telegram Bot")
 
 	nantunSportCenterBotService := crawler.NewNantunSportCenterBotService(browser, nantunSportCenterService, cfg)
 	handler := tgbot.NewMessageHandler(botService, &nantunSportCenterBotService)
@@ -50,9 +64,9 @@ func main() {
 	// 開始接收訊息
 	botService.StartReceiveMessage()
 
-	// 阻塞主程式，直到收到取消信號（例如 Ctrl+C）
+	// 阻塞主程式直到收到取消訊號
 	<-ctx.Done()
 
-	logger.Log.Info("Shutting down Telegram Bot...")
+	logger.Log.Info("Shutting down")
 	// #endregion
 }
