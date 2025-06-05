@@ -6,7 +6,7 @@ import (
 	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
 	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
-	"github.com/tian841224/crawler_sportcenter/internal/db"
+	"github.com/tian841224/crawler_sportcenter/internal/infrastructure/db"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 	"go.uber.org/zap"
