@@ -17,6 +17,8 @@ type TimeSlotRepository struct {
 	db *gorm.DB
 }
 
+var _ Repository = (*TimeSlotRepository)(nil)
+
 func NewTimeSlotRepository(db *gorm.DB) Repository {
 	return &TimeSlotRepository{db: db}
 }

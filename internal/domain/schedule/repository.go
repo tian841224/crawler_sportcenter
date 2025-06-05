@@ -18,6 +18,8 @@ type ScheduleRepository struct {
 	db *gorm.DB
 }
 
+var _ Repository = (*ScheduleRepository)(nil)
+
 func NewScheduleRepository(db *gorm.DB) Repository {
 	return &ScheduleRepository{db: db}
 }
@@ -42,7 +44,6 @@ func (r *ScheduleRepository) GetByUserID(ctx context.Context, userID uint) ([]*S
 	return schedules, nil
 }
 
-
 func (r *ScheduleRepository) Update(ctx context.Context, schedule *Schedule) error {
 	return r.db.WithContext(ctx).Save(schedule).Error
 }
@@ -50,4 +51,3 @@ func (r *ScheduleRepository) Update(ctx context.Context, schedule *Schedule) err
 func (r *ScheduleRepository) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Delete(&Schedule{}, id).Error
 }
-
