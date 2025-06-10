@@ -27,7 +27,7 @@ func NewUserService(repo Repository) Service {
 
 func (s *UserService) Create(ctx context.Context, user *User) error {
 	if user == nil {
-		return errors.New("user cannot be nil")
+		return errors.New("user 不能為空")
 	}
 
 	// 檢查用戶是否已存在

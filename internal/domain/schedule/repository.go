@@ -10,6 +10,7 @@ type Repository interface {
 	Create(ctx context.Context, schedule *Schedule) error
 	GetByID(ctx context.Context, id uint) (*Schedule, error)
 	GetByUserID(ctx context.Context, userID uint) ([]*Schedule, error)
+	GetAll(ctx context.Context) (*[]Schedule, error)
 	Update(ctx context.Context, schedule *Schedule) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -42,6 +43,14 @@ func (r *ScheduleRepository) GetByUserID(ctx context.Context, userID uint) ([]*S
 		return nil, err
 	}
 	return schedules, nil
+}
+
+func (r *ScheduleRepository) GetAll(ctx context.Context) (*[]Schedule, error) {
+	var schedules []Schedule
+	if err := r.db.WithContext(ctx).Find(&schedules).Error; err!= nil {
+		return nil, err
+	}
+	return &schedules, nil
 }
 
 func (r *ScheduleRepository) Update(ctx context.Context, schedule *Schedule) error {

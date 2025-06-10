@@ -11,6 +11,7 @@ type Service interface {
 	Create(ctx context.Context, schedule *Schedule) error
 	GetByID(ctx context.Context, id uint) (*Schedule, error)
 	GetByUserID(ctx context.Context, userID uint) ([]*Schedule, error)
+	GetAll(ctx context.Context) (*[]Schedule, error)
 	Update(ctx context.Context, schedule *Schedule) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -49,6 +50,10 @@ func (s *ScheduleService) GetByID(ctx context.Context, id uint) (*Schedule, erro
 
 func (s *ScheduleService) GetByUserID(ctx context.Context, userID uint) ([]*Schedule, error) {
 	return s.repo.GetByUserID(ctx, userID)
+}
+
+func (s *ScheduleService) GetAll(ctx context.Context) (*[]Schedule, error) {
+	return s.repo.GetAll(ctx)
 }
 
 func (s *ScheduleService) Update(ctx context.Context, schedule *Schedule) error {
