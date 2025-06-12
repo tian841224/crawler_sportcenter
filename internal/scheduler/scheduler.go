@@ -74,13 +74,15 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 		return err
 	}
 
-	// 按照星期排序
 	sort.Slice(*scheduleList, func(i, j int) bool {
-		return (*scheduleList)[i].Weekday < (*scheduleList)[j].Weekday
-	})
-
-	// 按照時段排序
-	sort.Slice(*scheduleList, func(i, j int) bool {
+		// 先比星期
+		if (*scheduleList)[i].Weekday != (*scheduleList)[j].Weekday {
+			return (*scheduleList)[i].Weekday < (*scheduleList)[j].Weekday
+		}
+		// 星期一樣時，比開始時間
+		if (*scheduleList)[i].TimeSlot == nil || (*scheduleList)[j].TimeSlot == nil {
+			return false // 或依你需求決定
+		}
 		return (*scheduleList)[i].TimeSlot.StartTime.Before((*scheduleList)[j].TimeSlot.StartTime)
 	})
 
@@ -93,7 +95,13 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 		if subs.Weekday != currentWeekday || subs.TimeSlot.StartTime.Hour() != currentTime {
 			// 檢查是否有可用場地
 			var err error
-			availableTimeSlots, err := s.nantunSportCenter.GetAvailableTimeSlots(subs.Weekday.String(), subs.TimeSlot.StartTime.Hour(), strconv.Itoa(chatID))
+			dayMap := map[string]string{
+				"0": "日", "1": "一", "2": "二",
+				"3": "三", "4": "四", "5": "五", "6": "六",
+			}
+
+			weekday := dayMap[strconv.Itoa(int(subs.Weekday))]
+			availableTimeSlots, err := s.nantunSportCenter.GetAvailableTimeSlots(weekday, int(*subs.TimeSlotID), strconv.Itoa(chatID))
 			if err != nil {
 				logger.Log.Error("checkAllSubscriptions", zap.Error(err))
 				continue
