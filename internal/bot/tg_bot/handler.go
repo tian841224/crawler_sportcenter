@@ -2,6 +2,7 @@ package tgbot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/tian841224/crawler_sportcenter/internal/types"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type MessageHandler struct {
@@ -47,21 +49,10 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 	case update.CallbackQuery != nil:
 		// 取TG ID
 		id := update.CallbackQuery.From.ID
-		// 儲存使用者ID
-		userObj, err := h.user.GetByID(context.Background(), uint(id))
+		_, err := h.getOrCreateUser(id)
 		if err != nil {
-			logger.Log.Error("get user by id", zap.Error(err))
+			logger.Log.Error("get or create user", zap.Error(err))
 			return
-		}
-		if userObj == nil {
-			err = h.user.Create(context.Background(), &user.User{
-				AccountID: fmt.Sprintf("%d", id),
-				Status:    true,
-			})
-			if err != nil {
-				logger.Log.Error("create user", zap.Error(err))
-				return
-			}
 		}
 
 		h.handleCallback(update.CallbackQuery)
@@ -238,8 +229,7 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 	}
 	timeSlotID := uint(timeSlotIDInt)
 
-	// TODO: 儲存使用者訂閱時間
-	userObj, err := h.user.GetByID(context.Background(), uint(callback.Message.Chat.ID))
+	userObj, err := h.user.GetByAccountID(context.Background(), fmt.Sprintf("%d", callback.Message.Chat.ID))
 	if err != nil {
 		logger.Log.Error("get user by id", zap.Error(err))
 		return
@@ -300,7 +290,7 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 
 func (h *MessageHandler) handleBooking(callback *tgbotapi.CallbackQuery) error {
 	selectedCourt := callback.Data[5:]
-	logger.Log.Info("用戶嘗試預約場地：" + selectedCourt)
+	logger.Log.Info("使用者嘗試預約場地：" + selectedCourt)
 
 	targetSlot := []types.CleanTimeSlot{{Button: selectedCourt}}
 	if err := h.nantun_sport.BookCourt(targetSlot); err != nil {
@@ -352,3 +342,22 @@ func (h *MessageHandler) getNantunSportAllAvailableTimeSlots(message *tgbotapi.M
 }
 
 // #endregion
+
+func (h *MessageHandler) getOrCreateUser(id int64) (*user.User, error) {
+	userObj, err := h.user.GetByAccountID(context.Background(), fmt.Sprintf("%d", id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 使用者不存在，建立新使用者
+			newUser := &user.User{
+				AccountID: fmt.Sprintf("%d", id),
+				Status:    true,
+			}
+			if err := h.user.Create(context.Background(), newUser); err != nil {
+				return nil, fmt.Errorf("create user: %w", err)
+			}
+			return newUser, nil
+		}
+		return nil, fmt.Errorf("get user by id: %w", err)
+	}
+	return userObj, nil
+}
