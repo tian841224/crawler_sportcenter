@@ -3,8 +3,6 @@ package schedule
 import (
 	"context"
 	"errors"
-
-	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -22,8 +20,8 @@ type ScheduleService struct {
 
 var _ Service = (*ScheduleService)(nil)
 
-func NewScheduleService(db *gorm.DB) Repository {
-	return &ScheduleRepository{db: db}
+func NewScheduleService(repo Repository) Service {
+	return &ScheduleService{repo: repo}
 }
 
 func (s *ScheduleService) Create(ctx context.Context, schedule *Schedule) error {
