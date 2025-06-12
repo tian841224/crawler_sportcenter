@@ -3,14 +3,11 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/tian841224/crawler_sportcenter/internal/domain/schedule"
-	timeslot "github.com/tian841224/crawler_sportcenter/internal/domain/time_slot"
-	"github.com/tian841224/crawler_sportcenter/internal/domain/user"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
+	"go.uber.org/zap"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,45 +19,38 @@ type DB struct {
 }
 
 func NewDB(cfg config.Config) *DB {
-	return &DB{
+	db := &DB{
 		cfg: cfg,
 	}
+	if err := db.initDatabase(); err != nil {
+		logger.Log.Error("資料庫初始化失敗", zap.Error(err))
+		return nil
+	}
+	return db
 }
 
 // InitDatabase 初始化資料庫
-func (d *DB) InitDatabase() (*gorm.DB, error) {
+func (d *DB) initDatabase() error {
 	// 建立基礎連接字串
 	baseDSN := fmt.Sprintf("host=localhost user=%s password=%s dbname=postgres sslmode=disable",
 		d.cfg.DBUser, d.cfg.DBPassword)
 
 	// 檢查並建立資料庫
 	if err := d.createDatabaseIfNotExists(baseDSN, d.cfg.DBName); err != nil {
-		return nil, err
+		return err
 	}
 
 	// 連接到指定的資料庫
 	db, err := d.connectToDatabase()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 設定連接
 	d.Conn = db
 
-	// 自動遷移模型到資料庫
-	if err := db.AutoMigrate(
-		&user.User{},
-		&timeslot.TimeSlot{},
-		&schedule.Schedule{},
-	); err != nil {
-		return nil, err
-	}
-
-	// 建立預設資料
-	d.initData()
-
 	logger.Log.Info("資料庫連線成功")
-	return db, nil
+	return nil
 }
 
 // connectToDatabase 連接到指定的資料庫
@@ -100,49 +90,6 @@ func (d *DB) createDatabaseIfNotExists(baseDSN, dbName string) error {
 	}
 
 	return nil
-}
-
-// 建立預設資料
-func (d *DB) initData() error {
-	if d.Conn == nil {
-		return fmt.Errorf("資料庫連接未初始化")
-	}
-
-	// 先建立預設時段
-	timeSlots := []timeslot.TimeSlot{
-		{StartTime: parseTime("06:00"), EndTime: parseTime("07:00")},
-		{StartTime: parseTime("07:00"), EndTime: parseTime("08:00")},
-		{StartTime: parseTime("08:00"), EndTime: parseTime("09:00")},
-		{StartTime: parseTime("09:00"), EndTime: parseTime("10:00")},
-		{StartTime: parseTime("10:00"), EndTime: parseTime("11:00")},
-		{StartTime: parseTime("11:00"), EndTime: parseTime("12:00")},
-		{StartTime: parseTime("12:00"), EndTime: parseTime("13:00")},
-		{StartTime: parseTime("13:00"), EndTime: parseTime("14:00")},
-		{StartTime: parseTime("14:00"), EndTime: parseTime("15:00")},
-		{StartTime: parseTime("15:00"), EndTime: parseTime("16:00")},
-		{StartTime: parseTime("16:00"), EndTime: parseTime("17:00")},
-		{StartTime: parseTime("17:00"), EndTime: parseTime("18:00")},
-		{StartTime: parseTime("18:00"), EndTime: parseTime("19:00")},
-		{StartTime: parseTime("19:00"), EndTime: parseTime("20:00")},
-		{StartTime: parseTime("20:00"), EndTime: parseTime("21:00")},
-		{StartTime: parseTime("21:00"), EndTime: parseTime("22:00")},
-	}
-
-	// 建立或取得時段資料
-	for i := range timeSlots {
-		result := d.Conn.Where("start_time = ? AND end_time = ?",
-			timeSlots[i].StartTime, timeSlots[i].EndTime).FirstOrCreate(&timeSlots[i])
-		if result.Error != nil {
-			return fmt.Errorf("建立時段失敗 (%s-%s): %w",
-				timeSlots[i].StartTime, timeSlots[i].EndTime, result.Error)
-		}
-	}
-	return nil
-}
-
-func parseTime(s string) time.Time {
-	t, _ := time.Parse("15:04", s)
-	return t
 }
 
 // DropDatabase 刪除指定的資料庫

@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/tian841224/crawler_sportcenter/internal/infrastructure/db"
+	"github.com/tian841224/crawler_sportcenter/pkg/logger"
+	"go.uber.org/zap"
 )
 
 type Repository interface {
@@ -21,6 +23,10 @@ type UserRepository struct {
 var _ Repository = (*UserRepository)(nil)
 
 func NewUserRepository(db *db.DB) Repository {
+	if err := db.Conn.AutoMigrate(&User{}); err != nil {
+		logger.Log.Error("資料庫遷移失敗", zap.Error(err))
+		return nil
+	}
 	return &UserRepository{db: db}
 }
 
