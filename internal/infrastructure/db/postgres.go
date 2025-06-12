@@ -110,6 +110,8 @@ func (d *DB) initData() error {
 
 	// 先建立預設時段
 	timeSlots := []timeslot.TimeSlot{
+		{StartTime: parseTime("06:00"), EndTime: parseTime("07:00")},
+		{StartTime: parseTime("07:00"), EndTime: parseTime("08:00")},
 		{StartTime: parseTime("08:00"), EndTime: parseTime("09:00")},
 		{StartTime: parseTime("09:00"), EndTime: parseTime("10:00")},
 		{StartTime: parseTime("10:00"), EndTime: parseTime("11:00")},
@@ -119,6 +121,7 @@ func (d *DB) initData() error {
 		{StartTime: parseTime("14:00"), EndTime: parseTime("15:00")},
 		{StartTime: parseTime("15:00"), EndTime: parseTime("16:00")},
 		{StartTime: parseTime("16:00"), EndTime: parseTime("17:00")},
+		{StartTime: parseTime("17:00"), EndTime: parseTime("18:00")},
 		{StartTime: parseTime("18:00"), EndTime: parseTime("19:00")},
 		{StartTime: parseTime("19:00"), EndTime: parseTime("20:00")},
 		{StartTime: parseTime("20:00"), EndTime: parseTime("21:00")},

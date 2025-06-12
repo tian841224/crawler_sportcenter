@@ -11,6 +11,7 @@ import (
 	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
 	"github.com/tian841224/crawler_sportcenter/internal/domain/schedule"
+	"github.com/tian841224/crawler_sportcenter/internal/domain/user"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -18,6 +19,7 @@ import (
 type SchedulerService struct {
 	nantunSportCenter crawler.NantunSportCenterBotInterface
 	schedule          schedule.Service
+	user              user.Service
 	tgBot             tgbot.TGBotInterface
 	mutex             sync.RWMutex
 	stopChan          chan struct{}
@@ -30,11 +32,12 @@ type SchedulerInterface interface {
 
 var _ SchedulerInterface = (*SchedulerService)(nil)
 
-func NewSchedulerService(nantunSportCenter crawler.NantunSportCenterBotInterface, schedule schedule.Service, tgBot tgbot.TGBotInterface) *SchedulerService {
+func NewSchedulerService(nantunSportCenter crawler.NantunSportCenterBotInterface, schedule schedule.Service, user user.Service, tgBot tgbot.TGBotInterface) *SchedulerService {
 	return &SchedulerService{
 		nantunSportCenter: nantunSportCenter,
 		tgBot:             tgBot,
 		schedule:          schedule,
+		user:              user,
 		stopChan:          make(chan struct{}),
 	}
 }
@@ -86,7 +89,7 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 	availableTimeSlotsLength := 0
 
 	for chatID, subs := range *scheduleList {
-		// 查詢的時間一樣則直接通知使用者
+		// 查詢的時間一樣直接通知使用者
 		if subs.Weekday != currentWeekday || subs.TimeSlot.StartTime.Hour() != currentTime {
 			// 檢查是否有可用場地
 			var err error
@@ -109,7 +112,18 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 			subs.TimeSlot.StartTime.Hour(),
 			subs.TimeSlot.EndTime.Hour())
 
-		s.tgBot.SendMessage(int64(chatID), message)
+		user, err := s.user.GetByID(ctx, subs.UserID)
+		if err != nil {
+			logger.Log.Error("checkAllSubscriptions", zap.Error(err))
+			continue
+		}
+		// TODO: 修改成TG帳號
+		accountID, err := strconv.ParseInt(user.AccountID, 10, 64)
+		if err != nil {
+			logger.Log.Error("invalid AccountID", zap.String("AccountID", user.AccountID), zap.Error(err))
+			continue
+		}
+		s.tgBot.SendMessage(accountID, message)
 
 		currentWeekday = subs.Weekday
 		currentTime = subs.TimeSlot.StartTime.Hour()

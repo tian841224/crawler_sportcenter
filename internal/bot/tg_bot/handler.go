@@ -1,29 +1,41 @@
 package tgbot
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
+	"github.com/tian841224/crawler_sportcenter/internal/domain/schedule"
+	timeslot "github.com/tian841224/crawler_sportcenter/internal/domain/time_slot"
+	"github.com/tian841224/crawler_sportcenter/internal/domain/user"
 	"github.com/tian841224/crawler_sportcenter/internal/types"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
+	"go.uber.org/zap"
 )
 
 type MessageHandler struct {
-	bot                   TGBotInterface
-	nantun_sport          crawler.NantunSportCenterBotInterface
-	userSelectionDate     string
-	userSelectionTimeSlot string
-	userList              map[int64]struct{}
+	bot                     TGBotInterface
+	nantun_sport            crawler.NantunSportCenterBotInterface
+	user                    user.Service
+	timeslot                timeslot.Service
+	schedule                schedule.Service
+	userSelectionDate       string
+	userSelectionWeekday    time.Weekday
+	userSelectionTimeSlotID uint
+	userSelectionTimeSlot   string
 }
 
-func NewMessageHandler(bot TGBotInterface, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
+func NewMessageHandler(bot TGBotInterface, user user.Service, timeslot timeslot.Service, schedule schedule.Service, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
 	return &MessageHandler{
 		bot:          bot,
 		nantun_sport: nantun_sport,
-		userList:     make(map[int64]struct{}),
+		user:         user,
+		timeslot:     timeslot,
+		schedule:     schedule,
 	}
 }
 
@@ -36,9 +48,22 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 		// 取TG ID
 		id := update.CallbackQuery.From.ID
 		// 儲存使用者ID
-		if _, exists := h.userList[id]; !exists {
-			h.userList[id] = struct{}{}
+		userObj, err := h.user.GetByID(context.Background(), uint(id))
+		if err != nil {
+			logger.Log.Error("get user by id", zap.Error(err))
+			return
 		}
+		if userObj == nil {
+			err = h.user.Create(context.Background(), &user.User{
+				AccountID: fmt.Sprintf("%d", id),
+				Status:    true,
+			})
+			if err != nil {
+				logger.Log.Error("create user", zap.Error(err))
+				return
+			}
+		}
+
 		h.handleCallback(update.CallbackQuery)
 	}
 }
@@ -61,23 +86,30 @@ const (
 	prefixDate          = "date_"
 	prefixTimeSlot      = "time_slot_"
 	prefixBook          = "book_"
+	prefixSubWeedDay    = "sub_weed_day_"
+	prefixSubTimeSlot   = "sub_time_slot_"
 )
 
 // 使用常量
 func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	switch {
+	// 南屯運動中心
 	case callback.Data == callbackNantunSport:
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleSportCenterSelection(callback)
+	// 返回主選單
 	case callback.Data == callbackBackToMain:
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleBackToMain(callback)
+	// 日期選擇
 	case strings.HasPrefix(callback.Data, prefixDate):
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleDateSelection(callback)
+	// 時段選擇
 	case strings.HasPrefix(callback.Data, prefixTimeSlot):
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleTimeSlotSelection(callback)
+	// 預約場地
 	case strings.HasPrefix(callback.Data, prefixBook):
 		h.bot.Request(tgbotapi.NewCallback(callback.ID, ""))
 		h.handleBooking(callback)
@@ -140,6 +172,13 @@ func (h *MessageHandler) handleDateSelection(callback *tgbotapi.CallbackQuery) {
 		"3": "三", "4": "四", "5": "五", "6": "六",
 	}
 	h.userSelectionDate = dayMap[callback.Data[5:]]
+
+	weekdayInt, err := strconv.Atoi(callback.Data[5:])
+	if err != nil {
+		logger.Log.Error("invalid weekday", zap.String("weekday", callback.Data[5:]), zap.Error(err))
+		return
+	}
+	h.userSelectionWeekday = time.Weekday(weekdayInt)
 	logger.Log.Info("收到按鈕回調：" + h.userSelectionDate)
 
 	text := "選擇訂閱時間"
@@ -192,6 +231,40 @@ func (h *MessageHandler) createTimeSlotKeyboard() tgbotapi.InlineKeyboardMarkup 
 func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuery) {
 	h.userSelectionTimeSlot = callback.Data[10:]
 	num, _ := strconv.Atoi(h.userSelectionTimeSlot)
+	timeSlotIDInt, err := strconv.Atoi(h.userSelectionTimeSlot)
+	if err != nil {
+		logger.Log.Error("invalid time slot", zap.String("time slot", h.userSelectionTimeSlot), zap.Error(err))
+		return
+	}
+	timeSlotID := uint(timeSlotIDInt)
+
+	// TODO: 儲存使用者訂閱時間
+	userObj, err := h.user.GetByID(context.Background(), uint(callback.Message.Chat.ID))
+	if err != nil {
+		logger.Log.Error("get user by id", zap.Error(err))
+		return
+	}
+	if userObj == nil {
+		err = h.user.Create(context.Background(), &user.User{
+			AccountID: fmt.Sprintf("%d", callback.Message.Chat.ID),
+			Status:    true,
+		})
+		if err != nil {
+			logger.Log.Error("create user", zap.Error(err))
+			return
+		}
+	}
+
+	err = h.schedule.Create(context.Background(), &schedule.Schedule{
+		UserID:     userObj.ID,
+		Weekday:    h.userSelectionWeekday,
+		TimeSlotID: &timeSlotID,
+	})
+
+	if err != nil {
+		logger.Log.Error("create schedule", zap.Error(err))
+		return
+	}
 
 	logger.Log.Info("User selected time slot: " + h.userSelectionTimeSlot)
 
@@ -200,6 +273,7 @@ func (h *MessageHandler) handleTimeSlotSelection(callback *tgbotapi.CallbackQuer
 		logger.Log.Error(err.Error())
 		return
 	}
+
 	if len(availableSlots) == 0 {
 		text := "目前無場地可預約，請重新選擇"
 		h.bot.SendMessage(callback.Message.Chat.ID, text)

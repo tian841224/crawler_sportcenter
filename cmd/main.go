@@ -6,6 +6,8 @@ import (
 	tgbot "github.com/tian841224/crawler_sportcenter/internal/bot/tg_bot"
 	"github.com/tian841224/crawler_sportcenter/internal/browser"
 	"github.com/tian841224/crawler_sportcenter/internal/crawler"
+	"github.com/tian841224/crawler_sportcenter/internal/domain/schedule"
+	"github.com/tian841224/crawler_sportcenter/internal/domain/user"
 	"github.com/tian841224/crawler_sportcenter/internal/infrastructure/db"
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
@@ -50,6 +52,18 @@ func main() {
 		return
 	}
 	logger.Log.Info("初始化Telegram Bot")
+
+	// #region 初始化Repository
+	userRepository := user.NewUserRepository(&dbInstance)
+	timeslotRepository := timeslot.NewTimeslotRepository(dbInstance)
+	scheduleRepository := schedule.NewScheduleRepository(dbInstance)
+	// #endregion
+
+	// #region 初始化Service
+	userService := user.NewUserService(dbInstance)
+	timeslotService := timeslot.NewTimeslotService(dbInstance)
+	scheduleService := schedule.NewScheduleService(dbInstance)
+	// #endregion
 
 	nantunSportCenterBotService := crawler.NewNantunSportCenterBotService(browser, nantunSportCenterService, cfg)
 	handler := tgbot.NewMessageHandler(botService, &nantunSportCenterBotService)
