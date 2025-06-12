@@ -155,10 +155,6 @@ func (s *BrowserService) initPage(tag string) (*rod.Page, error) {
 		Page: s.page,
 		Tag:  tag,
 	})
-	s.pages = append(s.pages, PageInfo{
-		Page: s.page,
-		Tag:  tag,
-	})
 	return s.page, nil
 }
 
