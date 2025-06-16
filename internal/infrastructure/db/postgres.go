@@ -31,25 +31,41 @@ func NewDB(cfg config.Config) *DB {
 
 // InitDatabase 初始化資料庫
 func (d *DB) initDatabase() error {
-	// 建立基礎連接字串
+	// 建立基礎連接字串 - 連接到預設的 postgres 資料庫
 	baseDSN := fmt.Sprintf("host=localhost user=%s password=%s dbname=postgres sslmode=disable",
 		d.cfg.DBUser, d.cfg.DBPassword)
 
+	logger.Log.Info("開始初始化資料庫",
+		zap.String("database", d.cfg.DBName),
+		zap.String("user", d.cfg.DBUser))
+
 	// 檢查並建立資料庫
 	if err := d.createDatabaseIfNotExists(baseDSN, d.cfg.DBName); err != nil {
-		return err
+		return fmt.Errorf("建立資料庫失敗: %w", err)
 	}
 
 	// 連接到指定的資料庫
 	db, err := d.connectToDatabase()
 	if err != nil {
-		return err
+		return fmt.Errorf("連接資料庫失敗: %w", err)
 	}
 
 	// 設定連接
 	d.Conn = db
 
-	logger.Log.Info("資料庫連線成功")
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("層資料庫連接失敗: %w", err)
+	}
+
+	// 執行簡單查詢測試連接
+	if err := sqlDB.Ping(); err != nil {
+		return fmt.Errorf("資料庫連接測試失敗: %w", err)
+	}
+
+	logger.Log.Info("資料庫連線成功",
+		zap.String("database", d.cfg.DBName),
+		zap.String("user", d.cfg.DBUser))
 	return nil
 }
 
@@ -60,7 +76,7 @@ func (d *DB) connectToDatabase() (*gorm.DB, error) {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("連接資料庫失敗: %w", err)
 	}
 
 	return db, nil
@@ -68,9 +84,11 @@ func (d *DB) connectToDatabase() (*gorm.DB, error) {
 
 // createDatabaseIfNotExists 檢查並建立資料庫
 func (d *DB) createDatabaseIfNotExists(baseDSN, dbName string) error {
+	logger.Log.Info("檢查資料庫是否存在", zap.String("database", dbName))
+
 	sqlDB, err := sql.Open("postgres", baseDSN)
 	if err != nil {
-		return err
+		return fmt.Errorf("連接到 postgres 資料庫失敗: %w", err)
 	}
 	defer sqlDB.Close()
 
@@ -78,15 +96,27 @@ func (d *DB) createDatabaseIfNotExists(baseDSN, dbName string) error {
 	query := "SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = $1)"
 	err = sqlDB.QueryRow(query, dbName).Scan(&exists)
 	if err != nil {
-		return err
+		return fmt.Errorf("檢查資料庫是否存在失敗: %w", err)
 	}
 
 	if !exists {
+		logger.Log.Info("開始建立資料庫", zap.String("database", dbName))
 		_, err = sqlDB.Exec("CREATE DATABASE " + dbName)
 		if err != nil {
-			return err
+			return fmt.Errorf("建立資料庫失敗: %w", err)
 		}
-		logger.Log.Info("資料庫建立成功: " + dbName)
+		logger.Log.Info("資料庫建立成功", zap.String("database", dbName))
+
+		// 驗證資料庫是否確實建立
+		err = sqlDB.QueryRow(query, dbName).Scan(&exists)
+		if err != nil {
+			return fmt.Errorf("驗證資料庫建立失敗: %w", err)
+		}
+		if !exists {
+			return fmt.Errorf("資料庫 %s 建立失敗", dbName)
+		}
+	} else {
+		logger.Log.Info("資料庫已存在", zap.String("database", dbName))
 	}
 
 	return nil
