@@ -29,6 +29,7 @@ type MessageHandler struct {
 	userSelectionWeekday    time.Weekday
 	userSelectionTimeSlotID uint
 	userSelectionTimeSlot   string
+	settingState            map[int64]string // 新增：用於追蹤使用者的設定狀態
 }
 
 func NewMessageHandler(bot TGBotInterface, user user.Service, timeslot timeslot.Service, schedule schedule.Service, nantun_sport crawler.NantunSportCenterBotInterface) *MessageHandler {
@@ -38,6 +39,7 @@ func NewMessageHandler(bot TGBotInterface, user user.Service, timeslot timeslot.
 		user:         user,
 		timeslot:     timeslot,
 		schedule:     schedule,
+		settingState: make(map[int64]string), // 初始化 settingState
 	}
 }
 
@@ -62,9 +64,25 @@ func (h *MessageHandler) HandleUpdate(update tgbotapi.Update) {
 // #region 處理所有格式訊息
 // 處理文字訊息
 func (h *MessageHandler) handleMessage(message *tgbotapi.Message) {
+	// 檢查是否在設定流程中
+	if state, exists := h.settingState[message.From.ID]; exists {
+		switch state {
+		case "waiting_account":
+			h.handleAccountInput(message)
+			h.settingState[message.From.ID] = "waiting_password"
+		case "waiting_password":
+			h.handlePasswordInput(message)
+			delete(h.settingState, message.From.ID) // 清除設定狀態
+		}
+		return
+	}
+
+	// 處理一般命令
 	switch message.Text {
 	case "/start":
 		h.handleStart(message)
+	case "/setting":
+		h.handleSetting(message)
 	default:
 		h.handleDefault(message)
 	}
@@ -81,7 +99,6 @@ const (
 	prefixSubTimeSlot   = "sub_time_slot_"
 )
 
-// 使用常量
 func (h *MessageHandler) handleCallback(callback *tgbotapi.CallbackQuery) {
 	switch {
 	// 南屯運動中心
@@ -329,6 +346,59 @@ func (h *MessageHandler) handleStart(message *tgbotapi.Message) {
 // 處理訊息
 func (h *MessageHandler) handleDefault(message *tgbotapi.Message) {
 	text := "收到您的訊息：" + message.Text
+	h.bot.SendMessage(message.Chat.ID, text)
+}
+
+// 處理 /setting 命令
+func (h *MessageHandler) handleSetting(message *tgbotapi.Message) {
+	text := "請輸入您的運動中心帳號："
+	h.bot.SendMessage(message.Chat.ID, text)
+	h.settingState[message.From.ID] = "waiting_account"
+}
+
+// 處理帳號輸入
+func (h *MessageHandler) handleAccountInput(message *tgbotapi.Message) {
+	userObj, err := h.getOrCreateUser(message.From.ID)
+	if err != nil {
+		logger.Log.Error("get or create user", zap.Error(err))
+		return
+	}
+
+	// 更新使用者帳號
+	err = h.user.Update(context.Background(), userObj.ID, map[string]interface{}{
+		"sport_center_account": message.Text,
+	})
+	if err != nil {
+		logger.Log.Error("update user account", zap.Error(err))
+		text := "設定帳號失敗，請重試"
+		h.bot.SendMessage(message.Chat.ID, text)
+		return
+	}
+
+	text := "請輸入您的運動中心密碼："
+	h.bot.SendMessage(message.Chat.ID, text)
+}
+
+// 處理密碼輸入
+func (h *MessageHandler) handlePasswordInput(message *tgbotapi.Message) {
+	userObj, err := h.getOrCreateUser(message.From.ID)
+	if err != nil {
+		logger.Log.Error("get or create user", zap.Error(err))
+		return
+	}
+
+	// 更新使用者密碼
+	err = h.user.Update(context.Background(), userObj.ID, map[string]interface{}{
+		"sport_center_password": message.Text,
+	})
+	if err != nil {
+		logger.Log.Error("update user password", zap.Error(err))
+		text := "設定密碼失敗，請重試"
+		h.bot.SendMessage(message.Chat.ID, text)
+		return
+	}
+
+	text := "帳號密碼設定完成！"
 	h.bot.SendMessage(message.Chat.ID, text)
 }
 
