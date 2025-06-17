@@ -54,7 +54,7 @@ func (r *ScheduleRepository) GetByUserID(ctx context.Context, userID uint) ([]*S
 func (r *ScheduleRepository) GetAll(ctx context.Context) (*[]Schedule, error) {
 	var schedules []Schedule
 	conn := (*r.db).GetConn().(*gorm.DB)
-	if err := conn.WithContext(ctx).Find(&schedules).Error; err != nil {
+	if err := conn.WithContext(ctx).Preload("TimeSlot").Find(&schedules).Error; err != nil {
 		return nil, err
 	}
 	return &schedules, nil
