@@ -23,9 +23,15 @@ type TGBotService struct {
 }
 
 func NewTGBotService(cfg config.Config) *TGBotService {
+	if cfg.TG_Bot_Token == "" {
+		logger.Log.Error("Telegram Bot Token 未設置，請檢查 .env 文件中的 TELEGRAM_BOT_TOKEN")
+		return nil
+	}
+
 	bot, err := tgbotapi.NewBotAPI(cfg.TG_Bot_Token)
 	if err != nil {
-		logger.Log.Error(err.Error())
+		logger.Log.Error("初始化 Telegram Bot 失敗：" + err.Error())
+		logger.Log.Error("請檢查 TELEGRAM_BOT_TOKEN 是否正確")
 		return nil
 	}
 
