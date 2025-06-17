@@ -3,6 +3,8 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -31,13 +33,18 @@ type Config struct {
 }
 
 func LoadConfig() Config {
+	// 取得前檔案的目錄
+	_, filename, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(filename)
+	projectRoot := filepath.Join(dir, "..", "..")
+	envPath := filepath.Join(projectRoot, ".env")
+
 	// 載入 .env 文件，指定正確的文件路徑
-	err := godotenv.Load("../.env")
+	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Println("無法載入 .env 文件，使用系統環境變數:", err)
+		log.Printf("無法載入 .env 檔案 (%s)，使用系統環境變數: %v", envPath, err)
 	}
 
-	// 從環境變數中獲取 TIME_SLOT_CODE 並轉換為整數切片
 	timeSlotCodesStr := strings.Split(os.Getenv("TIME_SLOT_CODE"), ",")
 	var timeSlotCodes []types.TimeSlotCode
 
