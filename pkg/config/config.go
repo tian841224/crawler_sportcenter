@@ -33,16 +33,38 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	// 取得前檔案的目錄
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
-	projectRoot := filepath.Join(dir, "..", "..")
-	envPath := filepath.Join(projectRoot, ".env")
+	var envPath string
+	var err error
 
-	// 載入 .env 文件，指定正確的文件路徑
-	err := godotenv.Load(envPath)
+	// 先讀取當前工作目錄的 .env（For部署環境）
+	currentDirEnv := ".env"
+	if _, err := os.Stat(currentDirEnv); err == nil {
+		envPath = currentDirEnv
+		err = godotenv.Load(envPath)
+		if err == nil {
+			log.Printf("成功載入 .env 檔案: %s", envPath)
+		}
+	}
+
+	// 如果當前目錄沒有或載入失敗，嘗試從程式碼位置推算的專案根目錄 (For開發環境)
+	if envPath == "" || err != nil {
+		_, filename, _, _ := runtime.Caller(0)
+		dir := filepath.Dir(filename)
+		projectRoot := filepath.Join(dir, "..", "..")
+		fallbackEnvPath := filepath.Join(projectRoot, ".env")
+
+		if _, statErr := os.Stat(fallbackEnvPath); statErr == nil {
+			envPath = fallbackEnvPath
+			err = godotenv.Load(envPath)
+			if err == nil {
+				log.Printf("成功載入 .env 檔案 (備援路徑): %s", envPath)
+			}
+		}
+	}
+
+	// 如果兩種方式都失敗，記錄錯誤但繼續執行（使用系統環境變數）
 	if err != nil {
-		log.Printf("無法載入 .env 檔案 (%s)，使用系統環境變數: %v", envPath, err)
+		log.Printf("無法載入 .env 檔案，使用系統環境變數。嘗試的路徑: 當前目錄/.env, %s", envPath)
 	}
 
 	timeSlotCodesStr := strings.Split(os.Getenv("TIME_SLOT_CODE"), ",")
@@ -55,7 +77,7 @@ func LoadConfig() Config {
 	}
 
 	if len(timeSlotCodes) == 0 {
-		timeSlotCodes = append(timeSlotCodes, types.TimeSlotCode(1)) // 默認值
+		timeSlotCodes = append(timeSlotCodes, types.TimeSlotCode(1))
 	}
 
 	// 從環境變數中獲取值
@@ -78,7 +100,7 @@ func LoadConfig() Config {
 		DayPeriod: func() int {
 			period, err := strconv.Atoi(os.Getenv("DAY_PERIOD"))
 			if err != nil {
-				return 1 // Default value if conversion fails
+				return 1
 			}
 			return period
 		}(),
