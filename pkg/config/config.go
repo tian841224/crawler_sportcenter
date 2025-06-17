@@ -11,6 +11,10 @@ import (
 )
 
 type Config struct {
+	DBType                string
+	DBPath                string
+	DBHost                string
+	DBPort                string
 	DBName                string
 	DBUser                string
 	DBPassword            string
@@ -49,6 +53,10 @@ func LoadConfig() Config {
 
 	// 從環境變數中獲取值
 	cfg := Config{
+		DBType:                os.Getenv("DB_TYPE"),
+		DBPath:                os.Getenv("DB_PATH"),
+		DBHost:                os.Getenv("DB_HOST"),
+		DBPort:                os.Getenv("DB_PORT"),
 		DBName:                os.Getenv("DB_NAME"),
 		DBUser:                os.Getenv("DB_USER"),
 		DBPassword:            os.Getenv("DB_PASSWORD"),

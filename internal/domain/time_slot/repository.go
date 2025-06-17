@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tian841224/crawler_sportcenter/internal/infrastructure/db"
+	"gorm.io/gorm"
 )
 
 type Repository interface {
@@ -23,7 +24,8 @@ var _ Repository = (*TimeSlotRepository)(nil)
 
 func NewTimeSlotRepository(db *db.DB) Repository {
 	repo := &TimeSlotRepository{db: db}
-	db.Conn.AutoMigrate(&TimeSlot{})
+	conn := (*db).GetConn().(*gorm.DB)
+	conn.AutoMigrate(&TimeSlot{})
 	if err := repo.initData(); err != nil {
 		fmt.Printf("初始化時段資料失敗: %v\n", err)
 		return nil
@@ -32,21 +34,25 @@ func NewTimeSlotRepository(db *db.DB) Repository {
 }
 
 func (r *TimeSlotRepository) Create(ctx context.Context, timeSlot *TimeSlot) error {
-	return r.db.Conn.WithContext(ctx).Create(timeSlot).Error
+	conn := (*r.db).GetConn().(*gorm.DB)
+	return conn.WithContext(ctx).Create(timeSlot).Error
 }
 
 func (r *TimeSlotRepository) GetByID(ctx context.Context, id uint) (*TimeSlot, error) {
 	var timeSlot TimeSlot
-	err := r.db.Conn.WithContext(ctx).First(&timeSlot, id).Error
+	conn := (*r.db).GetConn().(*gorm.DB)
+	err := conn.WithContext(ctx).First(&timeSlot, id).Error
 	return &timeSlot, err
 }
 
 func (r *TimeSlotRepository) Update(ctx context.Context, id uint, updates map[string]interface{}) error {
-	return r.db.Conn.WithContext(ctx).Model(&TimeSlot{}).Where("id =?", id).Updates(updates).Error
+	conn := (*r.db).GetConn().(*gorm.DB)
+	return conn.WithContext(ctx).Model(&TimeSlot{}).Where("id =?", id).Updates(updates).Error
 }
 
 func (r *TimeSlotRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.Conn.WithContext(ctx).Delete(&TimeSlot{}, id).Error
+	conn := (*r.db).GetConn().(*gorm.DB)
+	return conn.WithContext(ctx).Delete(&TimeSlot{}, id).Error
 }
 
 // 建立預設資料
@@ -55,9 +61,11 @@ func (r *TimeSlotRepository) initData() error {
 		return fmt.Errorf("資料庫連接未初始化")
 	}
 
+	conn := (*r.db).GetConn().(*gorm.DB)
+
 	// 檢查是否已經有資料
 	var count int64
-	if err := r.db.Conn.Model(&TimeSlot{}).Count(&count).Error; err != nil {
+	if err := conn.Model(&TimeSlot{}).Count(&count).Error; err != nil {
 		return fmt.Errorf("檢查資料數量失敗: %w", err)
 	}
 
@@ -88,7 +96,7 @@ func (r *TimeSlotRepository) initData() error {
 
 	// 建立或取得時段資料
 	for i := range timeSlots {
-		result := r.db.Conn.Where("start_time = ? AND end_time = ?",
+		result := conn.Where("start_time = ? AND end_time = ?",
 			timeSlots[i].StartTime, timeSlots[i].EndTime).FirstOrCreate(&timeSlots[i])
 		if result.Error != nil {
 			return fmt.Errorf("建立時段失敗 (%s-%s): %w",

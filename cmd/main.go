@@ -17,6 +17,7 @@ import (
 	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -33,7 +34,11 @@ func main() {
 
 	//  #region 初始化資料庫
 	logger.Log.Info("初始化資料庫")
-	dbInstance := db.NewDB(cfg)
+	dbInstance, err := db.NewDatabase()
+	if err != nil {
+		logger.Log.Error("資料庫初始化失敗", zap.Error(err))
+		return
+	}
 	if dbInstance == nil {
 		logger.Log.Error("資料庫初始化失敗")
 		return
@@ -61,9 +66,9 @@ func main() {
 
 	// #region 初始化Repository
 	logger.Log.Info("初始化Repository")
-	userRepository := user.NewUserRepository(dbInstance)
-	timeslotRepository := timeslot.NewTimeSlotRepository(dbInstance)
-	scheduleRepository := schedule.NewScheduleRepository(dbInstance)
+	userRepository := user.NewUserRepository(&dbInstance)
+	timeslotRepository := timeslot.NewTimeSlotRepository(&dbInstance)
+	scheduleRepository := schedule.NewScheduleRepository(&dbInstance)
 	// #endregion
 
 	// #region 初始化Service
@@ -111,7 +116,8 @@ func main() {
 	}
 
 	// 關閉資料庫連接
-	sqlDB, err := dbInstance.Conn.DB()
+	conn := dbInstance.GetConn().(*gorm.DB)
+	sqlDB, err := conn.DB()
 	if err != nil {
 		logger.Log.Error("取得資料庫連接失敗", zap.Error(err))
 	} else {

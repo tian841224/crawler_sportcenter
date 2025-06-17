@@ -13,27 +13,37 @@ import (
 	"gorm.io/gorm"
 )
 
-type DB struct {
+type PostgresDB struct {
 	Conn *gorm.DB
 	cfg  config.Config
 }
 
-func NewDB(cfg config.Config) *DB {
-	db := &DB{
+// NewPostgresDB 建立 PostgreSQL 資料庫連接，用於工廠模式
+func NewPostgresDB(cfg config.Config) *PostgresDB {
+	db := &PostgresDB{
 		cfg: cfg,
 	}
 	if err := db.initDatabase(); err != nil {
-		logger.Log.Error("資料庫初始化失敗", zap.Error(err))
+		logger.Log.Error("PostgreSQL 資料庫初始化失敗", zap.Error(err))
 		return nil
 	}
 	return db
 }
 
 // InitDatabase 初始化資料庫
-func (d *DB) initDatabase() error {
+func (d *PostgresDB) initDatabase() error {
 	// 建立基礎連接字串 - 連接到預設的 postgres 資料庫
-	baseDSN := fmt.Sprintf("host=localhost user=%s password=%s dbname=postgres sslmode=disable",
-		d.cfg.DBUser, d.cfg.DBPassword)
+	host := d.cfg.DBHost
+	if host == "" {
+		host = "localhost" // 預設值
+	}
+	port := d.cfg.DBPort
+	if port == "" {
+		port = "5432" // PostgreSQL 預設端口
+	}
+
+	baseDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=disable",
+		host, port, d.cfg.DBUser, d.cfg.DBPassword)
 
 	logger.Log.Info("開始初始化資料庫",
 		zap.String("database", d.cfg.DBName),
@@ -70,9 +80,18 @@ func (d *DB) initDatabase() error {
 }
 
 // connectToDatabase 連接到指定的資料庫
-func (d *DB) connectToDatabase() (*gorm.DB, error) {
-	dsn := fmt.Sprintf("host=localhost user=%s password=%s dbname=%s sslmode=disable",
-		d.cfg.DBUser, d.cfg.DBPassword, d.cfg.DBName)
+func (d *PostgresDB) connectToDatabase() (*gorm.DB, error) {
+	host := d.cfg.DBHost
+	if host == "" {
+		host = "localhost" // 預設值
+	}
+	port := d.cfg.DBPort
+	if port == "" {
+		port = "5432" // PostgreSQL 預設端口
+	}
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, d.cfg.DBUser, d.cfg.DBPassword, d.cfg.DBName)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -83,7 +102,7 @@ func (d *DB) connectToDatabase() (*gorm.DB, error) {
 }
 
 // createDatabaseIfNotExists 檢查並建立資料庫
-func (d *DB) createDatabaseIfNotExists(baseDSN, dbName string) error {
+func (d *PostgresDB) createDatabaseIfNotExists(baseDSN, dbName string) error {
 	logger.Log.Info("檢查資料庫是否存在", zap.String("database", dbName))
 
 	sqlDB, err := sql.Open("postgres", baseDSN)
@@ -123,10 +142,19 @@ func (d *DB) createDatabaseIfNotExists(baseDSN, dbName string) error {
 }
 
 // DropDatabase 刪除指定的資料庫
-func (d *DB) DropDatabase(dbName string) error {
+func (d *PostgresDB) DropDatabase(dbName string) error {
 	// 建立基礎連接字串連接到 postgres 資料庫
-	baseDSN := fmt.Sprintf("host=localhost user=%s password=%s dbname=postgres sslmode=disable",
-		d.cfg.DBUser, d.cfg.DBPassword)
+	host := d.cfg.DBHost
+	if host == "" {
+		host = "localhost" // 預設值
+	}
+	port := d.cfg.DBPort
+	if port == "" {
+		port = "5432" // PostgreSQL 預設端口
+	}
+
+	baseDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=disable",
+		host, port, d.cfg.DBUser, d.cfg.DBPassword)
 
 	// 連接到 postgres 資料庫
 	sqlDB, err := sql.Open("postgres", baseDSN)
@@ -161,4 +189,28 @@ func (d *DB) DropDatabase(dbName string) error {
 
 	logger.Log.Info("資料庫刪除成功: " + dbName)
 	return nil
+}
+
+// Close 關閉資料庫連接
+func (d *PostgresDB) Close() error {
+	if d.Conn == nil {
+		return nil
+	}
+
+	sqlDB, err := d.Conn.DB()
+	if err != nil {
+		return fmt.Errorf("取得底層資料庫連接失敗: %w", err)
+	}
+
+	if err := sqlDB.Close(); err != nil {
+		return fmt.Errorf("關閉 PostgreSQL 資料庫連接失敗: %w", err)
+	}
+
+	logger.Log.Info("PostgreSQL 資料庫連接已關閉")
+	return nil
+}
+
+// GetConn 獲取 GORM 連接
+func (d *PostgresDB) GetConn() interface{} {
+	return d.Conn
 }
