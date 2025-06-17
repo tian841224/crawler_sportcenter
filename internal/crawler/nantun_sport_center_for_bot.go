@@ -9,6 +9,7 @@ import (
 
 type NantunSportCenterBotInterface interface {
 	GetAvailableTimeSlots(weedday string, time_slot int, tag string) ([]types.CleanTimeSlot, error)
+	GetAvailableTimeSlotsForSchedule(weekday string, time_slot int, tag string) ([]types.CleanTimeSlot, error)
 	BookCourt(targetSlot []types.CleanTimeSlot) error
 	GetPaymentURL() string
 }
@@ -91,6 +92,77 @@ func (s *NantunSportCenterBotService) GetAvailableTimeSlots(weekday string, time
 
 	if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
 		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.selectDate(s.page, weekday); err != nil {
+		return nil, err
+	}
+
+	if err = s.nantunSportCenterService.selectTimeSlot(s.page, timeSlotCode); err != nil {
+		return nil, err
+	}
+
+	cleanSlots, err := s.nantunSportCenterService.getAllAvailableTimeSlots(s.page)
+	if err != nil {
+		return nil, err
+	}
+
+	targetSlot := s.nantunSportCenterService.findAvailableCourtsByTimeSlot(cleanSlots, timeSlotCode)
+
+	return targetSlot, nil
+}
+
+func (s *NantunSportCenterBotService) GetAvailableTimeSlotsForSchedule(weekday string, time_slot int, tag string) ([]types.CleanTimeSlot, error) {
+
+	timeSlotCode := types.TimeSlotCode(time_slot) // 將 int 轉換為 TimeSlotCode
+
+	var err error
+
+	s.page, err = s.browserService.GetPage(s.Nantun_Url, tag)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果頁面已存在的話，跳過以下步驟
+	if !s.hasTag(tag) {
+		s.tagList[tag] = struct{}{}
+		if err = s.nantunSportCenterService.login(s.page, s.cfg); err != nil {
+			return nil, err
+		}
+
+		// 點擊首頁按鈕返回
+		script := `() => {
+			try {
+				window.location = '/BPHome/BPHome';
+				return true;
+			} catch (e) {
+				console.error(e);
+				return false;
+			}
+		}`
+
+		// 執行返回首頁腳本
+		s.page.Eval(script)
+
+		if err = s.nantunSportCenterService.clickAgreeButton(s.page); err != nil {
+			return nil, err
+		}
+
+		if err = s.nantunSportCenterService.selectLocationBooking(s.page); err != nil {
+			return nil, err
+		}
+
+		if err = s.nantunSportCenterService.selectBadminton(s.page); err != nil {
+			return nil, err
+		}
+
+		if err = s.nantunSportCenterService.setCheckboxAndProceed(s.page); err != nil {
+			return nil, err
+		}
+
+		if err = s.nantunSportCenterService.proceedToBooking(s.page); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = s.nantunSportCenterService.selectDate(s.page, weekday); err != nil {

@@ -90,7 +90,13 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 	currentTime := time.Now().Hour()
 	availableTimeSlotsLength := 0
 
-	for chatID, subs := range *scheduleList {
+	for _, subs := range *scheduleList {
+		// 檢查 TimeSlot 是否為空值
+		if subs.TimeSlot == nil {
+			logger.Log.Warn("TimeSlot is nil", zap.Uint("scheduleID", subs.ID))
+			continue
+		}
+
 		// 查詢的時間一樣直接通知使用者
 		if subs.Weekday != currentWeekday || subs.TimeSlot.StartTime.Hour() != currentTime {
 			// 檢查是否有可用場地
@@ -101,7 +107,7 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 			}
 
 			weekday := dayMap[strconv.Itoa(int(subs.Weekday))]
-			availableTimeSlots, err := s.nantunSportCenter.GetAvailableTimeSlots(weekday, int(*subs.TimeSlotID), strconv.Itoa(chatID))
+			availableTimeSlots, err := s.nantunSportCenter.GetAvailableTimeSlotsForSchedule(weekday, int(*subs.TimeSlotID), strconv.Itoa(int(subs.UserID)))
 			if err != nil {
 				logger.Log.Error("checkAllSubscriptions", zap.Error(err))
 				continue
@@ -135,7 +141,7 @@ func (s *SchedulerService) checkAllSubscriptions(ctx context.Context) error {
 
 		currentWeekday = subs.Weekday
 		currentTime = subs.TimeSlot.StartTime.Hour()
-		logger.Log.Debug("checkAllSubscriptions", zap.Int("chatID", chatID), zap.Any("subs", subs))
+		logger.Log.Debug("checkAllSubscriptions", zap.Uint("scheduleID", subs.ID), zap.Any("subs", subs))
 	}
 
 	return nil
