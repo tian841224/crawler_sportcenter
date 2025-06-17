@@ -34,7 +34,7 @@ func main() {
 
 	//  #region 初始化資料庫
 	logger.Log.Info("初始化資料庫")
-	dbInstance, err := db.NewDatabase()
+	dbInstance, err := db.NewDatabase(cfg)
 	if err != nil {
 		logger.Log.Error("資料庫初始化失敗", zap.Error(err))
 		return

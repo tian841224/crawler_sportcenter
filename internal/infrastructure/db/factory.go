@@ -19,7 +19,7 @@ type DB interface {
 }
 
 // NewDatabase 根據環境變數建立適當的資料庫連接
-func NewDatabase() (DB, error) {
+func NewDatabase(cfg config.Config) (DB, error) {
 	// 載入 .env 文件
 	if err := godotenv.Load(); err != nil {
 		logger.Log.Warn("無法載入 .env 文件，使用系統環境變數", zap.Error(err))
@@ -35,14 +35,12 @@ func NewDatabase() (DB, error) {
 
 	switch dbType {
 	case "sqlite":
-		db := NewSQLiteDB()
+		db := NewSQLiteDB(cfg)
 		if db == nil {
 			return nil, fmt.Errorf("無法建立 SQLite 資料庫連接")
 		}
 		return db, nil
 	case "postgres", "postgresql":
-		// 從環境變數讀取配置
-		cfg := config.LoadConfig()
 		db := NewPostgresDB(cfg)
 		if db == nil {
 			return nil, fmt.Errorf("無法建立 PostgreSQL 資料庫連接")

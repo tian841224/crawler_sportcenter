@@ -2,11 +2,10 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/joho/godotenv"
+	"github.com/tian841224/crawler_sportcenter/pkg/config"
 	"github.com/tian841224/crawler_sportcenter/pkg/logger"
 	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
@@ -17,41 +16,32 @@ import (
 
 // SQLiteDB 包裝 GORM 資料庫連接
 type SQLiteDB struct {
-	Conn   *gorm.DB
-	dbName string
-	dbPath string
+	Conn *gorm.DB
+	cfg  config.Config
 }
 
-// NewSQLiteDB 建立 SQLite 資料庫連接，從環境變數讀取配置
-func NewSQLiteDB() *SQLiteDB {
-	// 載入 .env 文件
-	if err := godotenv.Load(); err != nil {
-		log.Println("無法載入 .env 文件，使用系統環境變數:", err)
+// NewSQLiteDB 建立 SQLite 資料庫連接，使用提供的配置
+func NewSQLiteDB(cfg config.Config) *SQLiteDB {
+	// 設置預設值
+	if cfg.DBName == "" {
+		cfg.DBName = "crawler_sportcenter_system"
 	}
 
-	// 從環境變數讀取資料庫名稱
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "crawler_sportcenter_system" // 預設值
-	}
-
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
+	if cfg.DBPath == "" {
 		// 取得執行檔所在目錄
 		execPath, err := os.Executable()
 		if err != nil {
 			// 如果無法取得執行檔路徑，使用當前目錄
-			dbPath = filepath.Join(".", dbName+".db")
+			cfg.DBPath = filepath.Join(".", cfg.DBName+".db")
 		} else {
 			// 使用執行檔所在目錄
 			execDir := filepath.Dir(execPath)
-			dbPath = filepath.Join(execDir, dbName+".db")
+			cfg.DBPath = filepath.Join(execDir, cfg.DBName+".db")
 		}
 	}
 
 	db := &SQLiteDB{
-		dbName: dbName,
-		dbPath: dbPath,
+		cfg: cfg,
 	}
 
 	if err := db.initDatabase(); err != nil {
@@ -64,16 +54,16 @@ func NewSQLiteDB() *SQLiteDB {
 // initDatabase 初始化 SQLite 資料庫
 func (d *SQLiteDB) initDatabase() error {
 	logger.Log.Info("開始初始化 SQLite 資料庫",
-		zap.String("database", d.dbName),
-		zap.String("path", d.dbPath))
+		zap.String("database", d.cfg.DBName),
+		zap.String("path", d.cfg.DBPath))
 
 	// 建立資料庫檔案
-	if err := d.createDatabaseIfNotExists(d.dbPath); err != nil {
+	if err := d.createDatabaseIfNotExists(d.cfg.DBPath); err != nil {
 		return fmt.Errorf("建立 SQLite 資料庫失敗: %w", err)
 	}
 
 	// 連接到資料庫
-	db, err := d.connectToDatabaseWithPath(d.dbPath)
+	db, err := d.connectToDatabaseWithPath(d.cfg.DBPath)
 	if err != nil {
 		return fmt.Errorf("連接 SQLite 資料庫失敗: %w", err)
 	}
@@ -93,8 +83,8 @@ func (d *SQLiteDB) initDatabase() error {
 	}
 
 	logger.Log.Info("SQLite 資料庫連線成功",
-		zap.String("database", d.dbName),
-		zap.String("path", d.dbPath))
+		zap.String("database", d.cfg.DBName),
+		zap.String("path", d.cfg.DBPath))
 	return nil
 }
 
